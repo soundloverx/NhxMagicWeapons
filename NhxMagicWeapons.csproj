@@ -131,13 +131,12 @@
     <EmbeddedResource Include="Assets\muspelheim_parts.bin">
       <LogicalName>muspelheim_parts</LogicalName>
     </EmbeddedResource>
+    <!-- What the mod uses of Magic Supremacy's asset bundle (Tools\slim_bundle.py), loaded from the DLL -->
+    <EmbeddedResource Include="Assets\nhx_magic_weapons">
+      <LogicalName>nhx_magic_weapons</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <!-- What the mod uses of Magic Supremacy's asset bundle (Tools\slim_bundle.py); loaded from the plugin folder -->
-    <None Include="Assets\nhx_magic_weapons">
-      <Link>nhx_magic_weapons</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <!-- The whole bundle, repacked by Tools\repack_bundle.py: the source of the one above, not shipped -->
     <None Include="Assets\magic_supremacy" />
     <None Include="CHANGELOG.md">

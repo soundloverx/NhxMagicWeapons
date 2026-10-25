@@ -22,21 +22,24 @@ namespace NhxMagicWeapons
         private const string PluginName = "NhxMagicWeapons";
         private const string PluginVersion = "1.0.0";
 
-        // What the mod uses of Magic Supremacy 3.1.5's asset bundle (Tools\slim_bundle.py), in the plugin's folder
-        private const string BundleFile = "nhx_magic_weapons";
+        // What the mod uses of Magic Supremacy 3.1.5's asset bundle (Tools\slim_bundle.py), embedded in the DLL
+        private const string BundleResource = "nhx_magic_weapons";
 
         internal static ManualLogSource Log { get; private set; }
         internal static AssetBundle Assets { get; private set; }
+
+        // Unity reads the bundle from it as its assets are loaded, so it stays open for as long as the game runs
+        private static Stream s_bundleStream;
 
         private void Awake()
         {
             Log = Logger;
 
-            string bundlePath = Path.Combine(Path.GetDirectoryName(Info.Location), BundleFile);
-            Assets = AssetBundle.LoadFromFile(bundlePath);
+            s_bundleStream = typeof(Plugin).Assembly.GetManifestResourceStream(BundleResource);
+            Assets = s_bundleStream != null ? AssetBundle.LoadFromStream(s_bundleStream) : null;
             if (Assets == null)
             {
-                Log.LogError($"Couldn't load {bundlePath}, so there are no magic weapons.");
+                Log.LogError($"Couldn't load the asset bundle {BundleResource} from the DLL, so there are no magic weapons.");
                 return;
             }
 
