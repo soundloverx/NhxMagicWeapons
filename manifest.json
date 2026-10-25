@@ -1,0 +1,10 @@
+{
+  "name": "NhxMagicWeapons",
+  "version_number": "1.0.0",
+  "website_url": "",
+  "description": "Private mod: magic weapons for our server, made with Magic Supremacy's models and effects. Not published on Thunderstore.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2202",
+    "ValheimModding-Jotunn-2.30.2"
+  ]
+}

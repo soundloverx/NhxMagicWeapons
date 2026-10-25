@@ -1,0 +1,25 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37614.0 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NhxMagicWeapons", "NhxMagicWeapons.csproj", "{2DD55629-50EB-4295-9B56-254439D7ADAB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2DD55629-50EB-4295-9B56-254439D7ADAB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2DD55629-50EB-4295-9B56-254439D7ADAB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2DD55629-50EB-4295-9B56-254439D7ADAB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2DD55629-50EB-4295-9B56-254439D7ADAB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EC961A58-42CC-4A82-8056-C25518F4E108}
+	EndGlobalSection
+EndGlobal
