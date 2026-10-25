@@ -6,6 +6,24 @@ namespace NhxMagicWeapons.Staves
     // The effects staves create, and the Magic Supremacy effects they use
     internal static class StaffEffects
     {
+        private static Transform s_container;
+
+        // Where the staves keep the prefabs they make: inactive, so that their components don't start; their copies do
+        internal static Transform Container
+        {
+            get
+            {
+                if (!s_container)
+                {
+                    GameObject container = new GameObject("NhxMagicWeapons prefabs");
+                    container.SetActive(false);
+                    Object.DontDestroyOnLoad(container);
+                    s_container = container.transform;
+                }
+                return s_container;
+            }
+        }
+
         // Effects with a ZNetView are networked: created here, they show on every game
         internal static void Create(GameObject[] prefabs, Vector3 position, Quaternion rotation)
         {
@@ -15,6 +33,41 @@ namespace NhxMagicWeapons.Staves
                 {
                     Object.Instantiate(prefab, position, rotation);
                 }
+            }
+        }
+
+        // An effect's copy, just created, made `scale` times its size: its particles (their size, speed and where they
+        // start) and its lights' reach. Their transforms' scale doesn't do it: its particles scale with it in some
+        // settings only (ParticleSystem.scalingMode), and those in world space keep their speed
+        internal static void Scale(GameObject effect, float scale, float speed = -1f)
+        {
+            if (speed < 0f)
+            {
+                speed = scale;
+            }
+            foreach (ParticleSystem particles in effect.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                ParticleSystem.MainModule main = particles.main;
+                if (main.startSize3D)
+                {
+                    main.startSizeXMultiplier *= scale;
+                    main.startSizeYMultiplier *= scale;
+                    main.startSizeZMultiplier *= scale;
+                }
+                else
+                {
+                    main.startSizeMultiplier *= scale;
+                }
+                main.startSpeedMultiplier *= speed;
+                ParticleSystem.ShapeModule shape = particles.shape;
+                shape.radius *= scale;
+                shape.scale *= scale;
+                ParticleSystem.NoiseModule noise = particles.noise;
+                noise.strengthMultiplier *= scale;
+            }
+            foreach (Light light in effect.GetComponentsInChildren<Light>(true))
+            {
+                light.range *= scale;
             }
         }
 

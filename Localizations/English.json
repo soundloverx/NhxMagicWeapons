@@ -1,8 +1,13 @@
 {
   "item_nhx_staffstorms": "Staff of Storms",
-  "item_nhx_staffstorms_description": "The storm answers whoever holds it. Its bolts strike the moment they leave the prongs, and raised to the sky (secondary attack), it calls lightning down where you aim.",
+  "item_nhx_staffstorms_description": "The power of Thor, stolen and corrupted by Hel. The storm answers its bearer.",
+  "item_nhx_staffmuspelheim": "Wrath of Muspelheim",
+  "item_nhx_staffmuspelheim_description": "A shard of the fire that burns in Surtr's realm, bound in steel. Muspelheim's anger has not cooled.",
   "item_nhx_chain": "Chain lightning",
   "item_nhx_chainjumps": "Chain jumps",
   "item_nhx_strike": "Call lightning",
+  "item_nhx_blastradius": "Blast radius",
+  "item_nhx_flamethrower": "Flamethrower",
+  "item_nhx_flamereach": "Flamethrower reach",
   "item_nhx_fromlevel": "from level"
 }

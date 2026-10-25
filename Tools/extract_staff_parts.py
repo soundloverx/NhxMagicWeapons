@@ -1,10 +1,12 @@
-# Makes Assets\staff_of_storms_parts.bin from the repacked bundle: the Staff of Storms' model (Thundersurge's mesh
-# "4MainCore") split into its body and the parts that come with the staff's level (Staves\StaffOfStorms\Effects\StaffModel.cs).
+# Makes a staff's model parts file from the repacked bundle: meshes split into the parts that come with the staff's level.
+# The game can't edit the meshes: they're loaded without their data kept readable. This reads them from the bundle with
+# UnityPy (pip install UnityPy), finds the parts by their place on the staff, and writes each part's own vertices and
+# triangles.
 #
-#   python -I Tools\extract_staff_parts.py Assets\magic_supremacy Assets\staff_of_storms_parts.bin
+#   python -I Tools\extract_staff_parts.py Assets\magic_supremacy storms Assets\staff_of_storms_parts.bin
+#   python -I Tools\extract_staff_parts.py Assets\magic_supremacy muspelheim Assets\muspelheim_parts.bin
 #
-# The game can't edit the mesh: it's loaded without its data kept readable. This reads it from the bundle with UnityPy
-# (pip install UnityPy), finds the parts by their place on the staff, and writes each part's own vertices and triangles.
+# storms: the Staff of Storms' model (Thundersurge's mesh "4MainCore"), for Staves\StaffOfStorms\Effects\StaffModel.cs.
 # The parts, in mesh units (the model scales them by 30, so 1 m is 1/30):
 # - prong0-3: the 4 prongs of the head, pieces of the textured submesh (2) beyond 0.6 m, reaching out more than 0.1 m:
 #   in the order they come, +y, -y (the opposite one), +x, -x
@@ -12,6 +14,12 @@
 #   its root (the end nearest the head), so that it can grow from there
 # - crystal_head, crystal_butt: the glowing crystals, the pieces of submesh 0 (it has nothing else) beyond 0 and below
 # - body: the rest, submeshes 1 to 4
+#
+# muspelheim: the Wrath of Muspelheim's swirls (the Incinerator's mesh "FireMainSwirl", the black ribbons twisting
+# around the staff, turned by its animation), for Staves\WrathOfMuspelheim\Effects\StaffModel.cs. Its 6 pieces, in pairs
+# twisting around each other: swirl_head0-1 around the flame crystal, swirl_shaft0-1 around the lower shaft,
+# swirl_butt0-1 around the butt's crystal (each pair in the order of their middle's angle around the staff). Nothing is
+# left of the mesh: no body.
 #
 # The file, little endian: "NHXP", version (int32), part count (int32), then for each part: its name (int32 length,
 # UTF-8), pivot (3 floats), vertex count (int32), positions (3 floats each), normals (3), tangents (4), UVs (2), submesh
@@ -23,22 +31,19 @@ import sys
 import UnityPy
 from UnityPy.helpers.MeshHelper import MeshHandler
 
-MESH = "4MainCore"
-SCALE = 30.0  # the model's scale: meters per mesh unit
-CRYSTALS = 0  # submesh of the crystals' glowing material
-TEXTURED = 2  # submesh of the prongs and spikes
+SCALE = 30.0  # the models' scale: meters per mesh unit
 
 
-def load_mesh(path):
+def load_mesh(path, name):
     env = UnityPy.load(path)
     for obj in env.objects:
-        if obj.type.name == "Mesh" and obj.peek_name() == MESH:
+        if obj.type.name == "Mesh" and obj.peek_name() == name:
             mesh = obj.read()
             handler = MeshHandler(mesh)
             handler.process()
             triangles = [[tuple(t) for t in sub] for sub in handler.get_triangles()]
             return handler.m_Vertices, handler.m_Normals, handler.m_Tangents, handler.m_UV0, triangles
-    raise SystemExit(f"No mesh {MESH} in {path}")
+    raise SystemExit(f"No mesh {name} in {path}")
 
 
 # Groups of triangles touching each other, by vertex position (vertices are split where their UVs or normals differ)
@@ -75,8 +80,13 @@ def describe(piece, vertices, triangles):
     return {"subs": {s for s, _ in piece}, "zmin": min(zs), "zmax": max(zs), "reach": reach, "angle": math.degrees(math.atan2(cy, cx))}
 
 
-def main(src, dst):
-    vertices, normals, tangents, uvs, triangles = load_mesh(src)
+# The Staff of Storms: [(name, piece, pivoted)]
+STORMS_MESH = "4MainCore"
+CRYSTALS = 0  # submesh of the crystals' glowing material
+TEXTURED = 2  # submesh of the prongs and spikes
+
+
+def storms_parts(vertices, triangles):
     found = {"prong": [], "spike": [], "crystal": []}
     taken = set()
     for piece in pieces(vertices, triangles):
@@ -103,6 +113,41 @@ def main(src, dst):
     parts += [(f"prong{n}", piece, False) for n, (_, piece) in enumerate(prongs)]
     parts += [(f"spike{n}", piece, True) for n, (_, piece) in enumerate(spikes)]
     parts += [("crystal_head", crystals[0][1], False), ("crystal_butt", crystals[1][1], False)]
+    return parts
+
+
+# The Wrath of Muspelheim: the swirls' pieces by where they are along the staff. In the model, z runs along the staff
+# (head up) and the swirls' mesh is placed at 30 × z - 0.056 m: around the head crystal from 0.58 m, the lower shaft from
+# -0.93 to -0.22, the butt below -0.94
+MUSPELHEIM_MESH = "FireMainSwirl"
+SWIRL_PLACE = 0.056
+
+
+def muspelheim_parts(vertices, triangles):
+    found = {"head": [], "shaft": [], "butt": []}
+    for piece in pieces(vertices, triangles):
+        d = describe(piece, vertices, triangles)
+        middle = (d["zmin"] + d["zmax"]) / 2 - SWIRL_PLACE
+        where = "head" if middle > 0.4 else "butt" if middle < -0.95 else "shaft"
+        found[where].append((d, piece))
+    if any(len(v) != 2 for v in found.values()):
+        raise SystemExit(f"Expected 2 swirls at the head, shaft and butt, found {[(k, len(v)) for k, v in found.items()]}")
+    parts = []
+    for where in ("head", "shaft", "butt"):
+        for n, (_, piece) in enumerate(sorted(found[where], key=lambda p: -p[0]["angle"])):
+            parts.append((f"swirl_{where}{n}", piece, False))
+    return parts
+
+
+STAFFS = {"storms": (STORMS_MESH, storms_parts), "muspelheim": (MUSPELHEIM_MESH, muspelheim_parts)}
+
+
+def main(src, staff, dst):
+    if staff not in STAFFS:
+        raise SystemExit(f"Unknown staff {staff}: use one of {', '.join(STAFFS)}")
+    mesh_name, split = STAFFS[staff]
+    vertices, normals, tangents, uvs, triangles = load_mesh(src, mesh_name)
+    parts = split(vertices, triangles)
 
     out = bytearray(b"NHXP") + struct.pack("<ii", 1, len(parts))
     total = 0
@@ -139,6 +184,6 @@ def main(src, dst):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        raise SystemExit("usage: extract_staff_parts.py <magic_supremacy bundle> <output .bin>")
-    main(sys.argv[1], sys.argv[2])
+    if len(sys.argv) != 4:
+        raise SystemExit("usage: extract_staff_parts.py <magic_supremacy bundle> storms|muspelheim <output .bin>")
+    main(*sys.argv[1:])

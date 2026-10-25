@@ -67,6 +67,10 @@
       <HintPath>..\..\valheim_mod_libraries\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine.AssetBundleModule">
       <HintPath>$(ValheimManaged)\UnityEngine.AssetBundleModule.dll</HintPath>
       <Private>False</Private>
@@ -93,7 +97,12 @@
     <Compile Include="ItemLevelCommand.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Staves\AttackEitr.cs" />
+    <Compile Include="Staves\FirstShot.cs" />
     <Compile Include="Staves\LevelDamage.cs" />
+    <Compile Include="Staves\LevelLook.cs" />
+    <Compile Include="Staves\LineMaterials.cs" />
+    <Compile Include="Staves\ModelParts.cs" />
     <Compile Include="Staves\SecondaryUnlock.cs" />
     <Compile Include="Staves\StaffEffects.cs" />
     <Compile Include="Staves\StaffHits.cs" />
@@ -105,11 +114,22 @@
     <Compile Include="Staves\StaffOfStorms\LightningBolt.cs" />
     <Compile Include="Staves\StaffOfStorms\LightningStrike.cs" />
     <Compile Include="Staves\StaffOfStorms\Staff.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\BeamLook.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\FireBeams.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\FlameLook.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\StaffLevelLook.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\StaffModel.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\FireBeam.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\FlameJet.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Staff.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Localizations\English.json" />
     <EmbeddedResource Include="Assets\staff_of_storms_parts.bin">
       <LogicalName>staff_of_storms_parts</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\muspelheim_parts.bin">
+      <LogicalName>muspelheim_parts</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -132,6 +152,7 @@
     <None Include="Tools\repack_bundle.py" />
     <None Include="Tools\slim_bundle.py" />
     <None Include="Tools\extract_staff_parts.py" />
+    <None Include="Tools\render_items.py" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

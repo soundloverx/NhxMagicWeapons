@@ -128,7 +128,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
                 return;
             }
 
-            Transform container = CreateContainer();
+            Transform container = StaffEffects.Container;
             LightningLook look = CreateLook(container);
 
             GameObject buzz = StaffEffects.AddWithoutParticles(BuzzName, SparksPrefab);
@@ -148,7 +148,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             ItemDrop.ItemData.SharedData shared = staff.GetComponent<ItemDrop>().m_itemData.m_shared;
             ItemDrop.ItemData.SharedData baseShared = embers.GetComponent<ItemDrop>().m_itemData.m_shared;
             shared.m_name = "$item_nhx_staffstorms";
-            shared.m_description = "$item_nhx_staffstorms_description";
+            shared.m_description = "$item_nhx_staffstorms_description   ";
             shared.m_damages = new HitData.DamageTypes { m_lightning = Lightning };
             shared.m_damagesPerLevel = new HitData.DamageTypes { m_lightning = LightningPerLevel };
             float northLightning = NorthLightningPerLevel - LightningPerLevel;
@@ -197,6 +197,8 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             strikeAttack.m_launchAngle = 0f;
             shared.m_secondaryAttack = strikeAttack;
             SecondaryUnlock.Add(shared, StrikeLevel);
+            // The strike costs its own eitr, not the bolt's
+            AttackEitr.Add(shared);
 
             CustomItem item = new CustomItem(staff, false, new ItemConfig
             {
@@ -222,15 +224,6 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
                 }
             }
             ItemManager.Instance.AddItem(item);
-        }
-
-        // Inactive, so that the components of the prefabs made here don't start; their copies do
-        private static Transform CreateContainer()
-        {
-            GameObject container = new GameObject("NhxMagicWeapons prefabs");
-            container.SetActive(false);
-            Object.DontDestroyOnLoad(container);
-            return container.transform;
         }
 
         // The model in parts that come with the staff's level

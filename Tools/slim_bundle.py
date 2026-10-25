@@ -22,6 +22,10 @@ KEEP = [
     "fx_stormcaller_staff_sphere_trap_land_DO",  # the crackle
     "fx_stormcaller_staff_sphere_hit_DO",        # the bolt's hit: a bang and a flash
     "fx_frostcaller_staff_shard_hit_DO",         # its material's additive particle shader, for the bolt's glow
+    "StaffFirecallerBlaster_DO",                 # the Wrath of Muspelheim's model (the Incinerator)
+    "sfx_firecaller_staff_blaster_shot_DO",      # its beam's shot
+    "fx_firecallercaller_staff_blaster_hit_DO",  # its blast, and the embers rising from its head
+    "fx_firecaller_staff_thrower_DO",            # its flamethrower's flames
 ]
 ALIGN = 16
 

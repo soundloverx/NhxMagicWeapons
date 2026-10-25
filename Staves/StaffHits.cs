@@ -176,14 +176,14 @@ namespace NhxMagicWeapons.Staves
         }
 
         // Like a projectile that hit a character: the skill rises and the caster gains adrenaline
-        internal static void OnCharacterHit(Character owner, HitData attack)
+        internal static void OnCharacterHit(Character owner, HitData attack, float adrenaline = Adrenaline)
         {
             if (!owner)
             {
                 return;
             }
             owner.RaiseSkill(attack.m_skill, attack.m_skillRaiseAmount);
-            owner.AddAdrenaline(Adrenaline);
+            owner.AddAdrenaline(adrenaline);
         }
 
         // Projectile.m_adrenaline's default

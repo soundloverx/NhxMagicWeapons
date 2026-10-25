@@ -54,6 +54,7 @@ namespace NhxMagicWeapons
         {
             PrefabManager.OnVanillaPrefabsAvailable -= AddWeapons;
             Staves.StaffOfStorms.Staff.Add();
+            Staves.WrathOfMuspelheim.Staff.Add();
         }
 
         private static void AddLocalizations()

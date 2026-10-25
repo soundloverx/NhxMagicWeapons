@@ -26,18 +26,19 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms.Effects
         public float m_glowSizePerLevel = 0.045f;
         public float m_branchesPerLevel = 0.1f;
 
-        // A Magic Supremacy effect whose material has the additive particle shader the glow needs
-        private const string AdditivePrefab = "fx_frostcaller_staff_shard_hit_DO";
-
         // On an object of its own under `container`, with the bolts drawn with the material of `materialEffect`'s "Flash"
-        // (a Magic Supremacy effect)
+        // (a Magic Supremacy effect: Thundersurge's sparks, Legacy Shaders/Particles/Alpha Blended, untextured), with soft
+        // edges. The glow fades from the middle to nothing at the edges: drawn over the bolt with the core's material, it
+        // looked like a second, fainter line
         internal static LightningLook Create(Transform container, string name, string materialEffect)
         {
             GameObject go = new GameObject(name);
             go.transform.SetParent(container, false);
             LightningLook look = go.AddComponent<LightningLook>();
-            look.m_coreMaterial = CoreMaterial(materialEffect);
-            look.m_glowMaterial = GlowMaterial(look.m_coreMaterial);
+            look.m_coreMaterial = LineMaterials.Copy(materialEffect, "Flash");
+            look.m_coreMaterial.mainTexture = LineMaterials.Band("nhx_bolt_core", across => 1f - across * across * across * across);
+            look.m_glowMaterial = LineMaterials.Additive(look.m_coreMaterial);
+            look.m_glowMaterial.mainTexture = LineMaterials.Band("nhx_bolt_glow", across => (1f - across) * (1f - across));
             return look;
         }
 
@@ -55,70 +56,6 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms.Effects
                 m_glowSize = m_glowSize + (level - 1) * m_glowSizePerLevel,
                 m_branches = level * m_branchesPerLevel,
             };
-        }
-
-        // The bolts and their forks: the material of a Magic Supremacy effect's sparks (Thundersurge's: Legacy
-        // Shaders/Particles/Alpha Blended, untextured), or one the game always has, with soft edges
-        private static Material CoreMaterial(string effect)
-        {
-            GameObject source = Plugin.Assets.LoadAsset<GameObject>(effect);
-            Transform flash = source ? source.transform.Find("Flash") : null;
-            Renderer renderer = flash ? flash.GetComponent<Renderer>() : null;
-            Material material;
-            if (renderer && renderer.sharedMaterial)
-            {
-                material = new Material(renderer.sharedMaterial);
-            }
-            else
-            {
-                Plugin.Log.LogWarning($"{effect} has no sparks' material: the bolts are drawn plain.");
-                material = new Material(Shader.Find("Sprites/Default"));
-            }
-            material.mainTexture = Band("nhx_bolt_core", across => 1f - across * across * across * across);
-            return material;
-        }
-
-        // The glow: added to what's behind it, as light, and fading from the middle to nothing at the edges. Drawn over the
-        // bolt with the core's material, it looked like a second, fainter line. Legacy Shaders/Particles/Additive isn't
-        // always loaded in the game, so it comes from a Magic Supremacy effect that uses it
-        private static Material GlowMaterial(Material core)
-        {
-            GameObject source = Plugin.Assets.LoadAsset<GameObject>(AdditivePrefab);
-            Renderer renderer = source ? source.GetComponent<Renderer>() : null;
-            Material material;
-            if (renderer && renderer.sharedMaterial)
-            {
-                material = new Material(renderer.sharedMaterial.shader);
-                // It draws 2 × this × the line's color: neutral
-                material.SetColor("_TintColor", new Color(0.5f, 0.5f, 0.5f, 0.5f));
-            }
-            else
-            {
-                Plugin.Log.LogWarning($"{AdditivePrefab} isn't in the asset bundle: the bolts' glow is drawn like their core.");
-                material = new Material(core);
-            }
-            material.mainTexture = Band("nhx_bolt_glow", across => (1f - across) * (1f - across));
-            return material;
-        }
-
-        // A band across a line's width, for LineRenderers (stretched along the line, the texture's v runs across it):
-        // white, its opacity given from the middle of the line (0) to its edges (1)
-        private static Texture2D Band(string name, System.Func<float, float> opacity)
-        {
-            const int Size = 64;
-            Texture2D texture = new Texture2D(1, Size, TextureFormat.RGBA32, false)
-            {
-                name = name,
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-            };
-            for (int y = 0; y < Size; y++)
-            {
-                float across = Mathf.Abs((y + 0.5f) / Size * 2f - 1f);
-                texture.SetPixel(0, y, new Color(1f, 1f, 1f, Mathf.Clamp01(opacity(across))));
-            }
-            texture.Apply();
-            return texture;
         }
     }
 
