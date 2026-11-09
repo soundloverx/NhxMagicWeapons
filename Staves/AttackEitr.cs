@@ -1,5 +1,4 @@
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 
 namespace NhxMagicWeapons.Staves
@@ -17,19 +16,22 @@ namespace NhxMagicWeapons.Staves
             s_items.Add(shared.m_name);
         }
 
-        // What the attack takes as it starts, or at each burst (Attack.Start, Update, FireProjectileBurst)
-        [HarmonyPatch(typeof(Attack), "GetAttackEitr", new Type[0])]
+        // Attacks ask the private GetAttackEitr() as they start, or at each burst (Attack.Start, Update,
+        // FireProjectileBurst), which only calls this one, where the game works the cost out. Other mods' discounts
+        // patch the private one, multiplying its result (Jewelcrafting's Magical Bargain and Apotheosis), so the cost is
+        // set here, before them: patching the private one too, after theirs, erased them (the user's test, 2026-11-09).
+        // Wild Weapons patches this one the same way for every weapon
+        [HarmonyPatch(typeof(Attack), "GetAttackEitr", typeof(Character), typeof(ItemDrop.ItemData))]
         private static class GetAttackEitr
         {
-            private static void Postfix(Attack __instance, ref float __result)
+            private static void Postfix(Attack __instance, Character character, ItemDrop.ItemData weapon, ref float __result)
             {
-                ItemDrop.ItemData weapon = __instance.m_weapon;
-                if (weapon == null || !__instance.m_character || !s_items.Contains(weapon.m_shared.m_name))
+                if (weapon == null || !character || !s_items.Contains(weapon.m_shared.m_name))
                 {
                     return;
                 }
                 float eitr = __instance.m_attackEitr;
-                __result = eitr <= 0f ? 0f : eitr - eitr * 0.33f * __instance.m_character.GetSkillFactor(weapon.m_shared.m_skillType);
+                __result = eitr <= 0f ? 0f : eitr - eitr * 0.33f * character.GetSkillFactor(weapon.m_shared.m_skillType);
             }
         }
     }

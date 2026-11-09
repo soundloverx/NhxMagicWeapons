@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.0.2
+- Fixed Jewelcrafting's eitr discounts (Magical Bargain, Apotheosis) not applying to the Staff of Storms and Wrath of Muspelheim
+
 ## v1.0.1
 - Tweaked damage and durability of the Staff of Storms and Wrath of Muspelheim to be more in line with other staves
 
