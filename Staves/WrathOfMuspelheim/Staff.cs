@@ -45,19 +45,23 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         // pierce, which hits at once: 54 pierce and 81 fire at level 1, 2 and 3 more each level (5, as the Staff of Storms'
         // lightning), 4 and 7 from level 10 (11). Where the Staff of Storms gets 10 fire at level 10 (1 more each level
         // after), this gets as much more fire; and the same spirit from level 5: 10, 1 more each level after. In all: 165
-        // at 5 (62 pierce, 93 fire, 10 spirit), 211 at 10, 276 at 15, 341 at 20 (114 pierce, 202 fire, 25 spirit)
-        private const float Pierce = 54f;
-        private const float PiercePerLevel = 2f;
-        private const float Fire = 81f;
-        private const float FirePerLevel = 3f;
+        // at 5 (62 pierce, 93 fire, 10 spirit), 211 at 10, 276 at 15, 341 at 20 (114 pierce, 202 fire, 25 spirit).
+        // Since v1.0.1 all of it is 15% higher (DamageBoost), at every level, as the Staff of Storms': 155 at 1, 190 at 5,
+        // 243 at 10, 317 at 15, 392 at 20 (131 pierce, 232 fire, 29 spirit). The blast, the flames and the tooltip follow,
+        // as they come from the staff's damage
+        private const float DamageBoost = 1.15f;
+        private const float Pierce = 54f * DamageBoost;
+        private const float PiercePerLevel = 2f * DamageBoost;
+        private const float Fire = 81f * DamageBoost;
+        private const float FirePerLevel = 3f * DamageBoost;
         private const int NorthLevel = 10;
-        private const float NorthPiercePerLevel = 4f;
-        private const float NorthFirePerLevel = 7f;
-        private const float NorthFire = 10f;
-        private const float NorthFireBonusPerLevel = 1f;
+        private const float NorthPiercePerLevel = 4f * DamageBoost;
+        private const float NorthFirePerLevel = 7f * DamageBoost;
+        private const float NorthFire = 10f * DamageBoost;
+        private const float NorthFireBonusPerLevel = 1f * DamageBoost;
         private const int SpiritLevel = 5;
-        private const float Spirit = 10f;
-        private const float SpiritPerLevel = 1f;
+        private const float Spirit = 10f * DamageBoost;
+        private const float SpiritPerLevel = 1f * DamageBoost;
         private const float BeamEitr = 30f;
         private const float BeamRange = 50f;
         // Its attack: the flamethrower's animation, staff held forward (the user, 2026-10-25: "It feels more appropriate to
@@ -68,6 +72,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         // before it became a waveform
         private const float BeamDuration = 0.6f;
         private const float AttackForce = 40f;
+        // The Staff of Embers' durability (its base and per level) times this
+        private const float DurabilityBoost = 2f;
         // The beam's look by the staff's level, up to level 20 (higher levels look the same): waveforms side by side (see
         // FireBeams), one more at levels 5 and 10 (1 at levels 1-4, 2 at 5-9, 3 from 10; the user asked for 2 fewer at 20
         // than the Staff of Storms' 5), each thicker at each level from 50% of a full beam's width (35% until the user
@@ -163,8 +169,9 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             // The rest as the Staff of Embers
             shared.m_maxQuality = baseShared.m_maxQuality;
             shared.m_weight = baseShared.m_weight;
-            shared.m_maxDurability = baseShared.m_maxDurability;
-            shared.m_durabilityPerLevel = baseShared.m_durabilityPerLevel;
+            // Twice its durability, at every level (since v1.0.1)
+            shared.m_maxDurability = baseShared.m_maxDurability * DurabilityBoost;
+            shared.m_durabilityPerLevel = baseShared.m_durabilityPerLevel * DurabilityBoost;
             shared.m_useDurabilityDrain = baseShared.m_useDurabilityDrain;
             shared.m_blockPower = baseShared.m_blockPower;
             shared.m_blockPowerPerLevel = baseShared.m_blockPowerPerLevel;

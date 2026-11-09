@@ -44,17 +44,20 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         // from level 5 and fire from level 10, as the model changes: 10, and 1 more each level after. In all: 165 at 5, 189
         // at 9, 276 at 15, 341 at 20. That's 10% under what matched theirs (184 at 5, 212 at 9, 305 at 15), as the bolt
         // never misses: it hits at once, where the crosshair is. The Charred (Ashlands) are weak to spirit, which most
-        // other creatures ignore; most of the Deep North's creatures are weak to fire
-        private const float Lightning = 135f;
-        private const float LightningPerLevel = 5f;
+        // other creatures ignore; most of the Deep North's creatures are weak to fire.
+        // Since v1.0.1 all of it is 15% higher (DamageBoost), at every level: 155 at 1, 190 at 5, 217 at 9, 243 at 10, 317
+        // at 15, 392 at 20. The strike, the chain's jumps and the tooltip follow, as they come from the staff's damage
+        private const float DamageBoost = 1.15f;
+        private const float Lightning = 135f * DamageBoost;
+        private const float LightningPerLevel = 5f * DamageBoost;
         private const int NorthLevel = 10;
-        private const float NorthLightningPerLevel = 11f;
+        private const float NorthLightningPerLevel = 11f * DamageBoost;
         private const int SpiritLevel = 5;
-        private const float Spirit = 10f;
-        private const float SpiritPerLevel = 1f;
+        private const float Spirit = 10f * DamageBoost;
+        private const float SpiritPerLevel = 1f * DamageBoost;
         private const int FireLevel = 10;
-        private const float Fire = 10f;
-        private const float FirePerLevel = 1f;
+        private const float Fire = 10f * DamageBoost;
+        private const float FirePerLevel = 1f * DamageBoost;
         private const float BoltEitr = 30f;
         private const float BoltRange = 50f;
         // The lightning's look by the staff's level, up to level 20 (higher levels look the same). It's drawn as thin bolts
@@ -117,6 +120,8 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         private const float StrikeRange = 60f;
         private const float StrikeRadius = 3.5f;
         private const float AttackForce = 40f;
+        // The Staff of Embers' durability (its base and per level) times this
+        private const float DurabilityBoost = 2f;
 
         internal static void Add()
         {
@@ -162,8 +167,9 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             // The rest as the Staff of Embers
             shared.m_maxQuality = baseShared.m_maxQuality;
             shared.m_weight = baseShared.m_weight;
-            shared.m_maxDurability = baseShared.m_maxDurability;
-            shared.m_durabilityPerLevel = baseShared.m_durabilityPerLevel;
+            // Twice its durability, at every level (since v1.0.1)
+            shared.m_maxDurability = baseShared.m_maxDurability * DurabilityBoost;
+            shared.m_durabilityPerLevel = baseShared.m_durabilityPerLevel * DurabilityBoost;
             shared.m_useDurabilityDrain = baseShared.m_useDurabilityDrain;
             shared.m_blockPower = baseShared.m_blockPower;
             shared.m_blockPowerPerLevel = baseShared.m_blockPowerPerLevel;

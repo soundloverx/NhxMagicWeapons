@@ -20,7 +20,7 @@ namespace NhxMagicWeapons
     {
         internal const string PluginGuid = "NhxMagicWeapons";
         private const string PluginName = "NhxMagicWeapons";
-        private const string PluginVersion = "1.0.0";
+        private const string PluginVersion = "1.0.1";
 
         // What the mod uses of Magic Supremacy 3.1.5's asset bundle (Tools\slim_bundle.py), embedded in the DLL
         private const string BundleResource = "nhx_magic_weapons";
