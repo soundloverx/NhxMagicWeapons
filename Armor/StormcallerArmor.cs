@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Jotunn.Configs;
 using Jotunn.Entities;
 using Jotunn.Managers;
@@ -15,9 +16,8 @@ namespace NhxMagicWeapons.Armor
     // picks, 2026-11-10): with the Staff of Storms, its secondary attack becomes the Eye of the Storm (StormEye) and a dodge
     // Lightning Step (LightningStep), and the robe's crystal crackles (ArmorCrackle); and lightning damage by its pieces'
     // levels, as the Firecaller's fire (LevelSetBonus).
-    // The recipes are the user's (2026-11-11). Placeholders until the user picks them: the stats, Magic Supremacy's: 22
-    // armor (cloak 3), 2 more a level (cloak 1); eitr regen +32% hood, +54% robe and greaves, +12% cloak (+152% in all); the cloak 9% faster and resistant to
-    // lightning (fire, for the Firecaller's), the greaves slightly resistant to frost.
+    // The recipes are the user's (2026-11-11). The stats are Magic Supremacy's, kept as they were and written out here
+    // (Stats) so they can be read without the game.
     // This builds and registers both sets and their recipes; all their numbers are here.
     internal static class StormcallerArmor
     {
@@ -67,8 +67,9 @@ namespace NhxMagicWeapons.Armor
         private const string Idol = "Upgrader6Armor";
 
         // The user's (2026-11-11), the same for both sets: each requirement's amount for crafting, then for the upgrade at
-        // the table (the game asks the second for each level above 1; a 0 isn't asked or shown)
-        private static RequirementConfig[] Requirements(string piece)
+        // the table (the game asks the second for each level above 1; a 0 isn't asked or shown). Only the jute differs:
+        // blue for Stormcaller's Raiment, red for the Firecaller's Regalia
+        private static RequirementConfig[] Requirements(string piece, string jute)
         {
             switch (piece)
             {
@@ -79,6 +80,7 @@ namespace NhxMagicWeapons.Armor
                         new RequirementConfig("AsksvinCarrionSkull", 1, 0),
                         new RequirementConfig("AskHide", 10, 10),
                         new RequirementConfig("CelestialFeather", 0, 2),
+                        new RequirementConfig(jute, 4, 0),
                         new RequirementConfig(Idol, 1, 0, false),
                     };
                 case "Robe":
@@ -88,6 +90,7 @@ namespace NhxMagicWeapons.Armor
                         new RequirementConfig("AsksvinCarrionRibcage", 1, 0),
                         new RequirementConfig("FlametalNew", 10, 10),
                         new RequirementConfig("CelestialFeather", 0, 2),
+                        new RequirementConfig(jute, 10, 0),
                         new RequirementConfig(Idol, 1, 0, false),
                     };
                 case "Greaves":
@@ -97,6 +100,7 @@ namespace NhxMagicWeapons.Armor
                         new RequirementConfig("AsksvinCarrionPelvic", 1, 0),
                         new RequirementConfig("FlametalNew", 10, 10),
                         new RequirementConfig("CelestialFeather", 0, 2),
+                        new RequirementConfig(jute, 6, 0),
                         new RequirementConfig(Idol, 1, 0, false),
                     };
                 default: // Cloak
@@ -105,9 +109,60 @@ namespace NhxMagicWeapons.Armor
                         new RequirementConfig("AskHide", 10, 0),
                         new RequirementConfig("FlametalNew", 10, 10),
                         new RequirementConfig("CelestialFeather", 4, 2),
+                        new RequirementConfig(jute, 10, 0),
                         new RequirementConfig(Idol, 1, 0, false),
                     };
             }
+        }
+
+        // Each piece's stats: Magic Supremacy's, as its bundle has them (read 2026-11-11), written over the cloned
+        // prefab's so they're seen here. The same for both sets, but for the cloak's resistance: the set's element
+        // (lightning for Stormcaller's Raiment, fire for the Firecaller's Regalia). Armor and durability rise by their
+        // per-level amount for each level above 1; eitr regen and movement are fractions (0.32 is +32%)
+        private struct PieceStats
+        {
+            internal float Armor, ArmorPerLevel, EitrRegen, Durability, DurabilityPerLevel, Weight, Movement;
+            internal HitData.DamageModPair[] Resistances;
+        }
+
+        private static PieceStats Stats(string piece, HitData.DamageType element)
+        {
+            switch (piece)
+            {
+                case "Hood":
+                    return new PieceStats
+                    {
+                        Armor = 22, ArmorPerLevel = 2, EitrRegen = 0.32f, Durability = 1000, DurabilityPerLevel = 200,
+                        Weight = 1, Movement = 0,
+                        Resistances = new HitData.DamageModPair[0],
+                    };
+                case "Robe":
+                    return new PieceStats
+                    {
+                        Armor = 22, ArmorPerLevel = 2, EitrRegen = 0.54f, Durability = 1000, DurabilityPerLevel = 200,
+                        Weight = 5, Movement = 0,
+                        Resistances = new HitData.DamageModPair[0],
+                    };
+                case "Greaves":
+                    return new PieceStats
+                    {
+                        Armor = 22, ArmorPerLevel = 2, EitrRegen = 0.54f, Durability = 1000, DurabilityPerLevel = 200,
+                        Weight = 5, Movement = 0,
+                        Resistances = new[] { Resists(HitData.DamageType.Frost, HitData.DamageModifier.Resistant) },
+                    };
+                default: // Cloak
+                    return new PieceStats
+                    {
+                        Armor = 3, ArmorPerLevel = 1, EitrRegen = 0.12f, Durability = 1500, DurabilityPerLevel = 50,
+                        Weight = 4, Movement = 0.09f,
+                        Resistances = new[] { Resists(element, HitData.DamageModifier.Resistant) },
+                    };
+            }
+        }
+
+        private static HitData.DamageModPair Resists(HitData.DamageType type, HitData.DamageModifier modifier)
+        {
+            return new HitData.DamageModPair { m_type = type, m_modifier = modifier };
         }
 
         internal static void Add()
@@ -200,19 +255,18 @@ namespace NhxMagicWeapons.Armor
             shared.m_setName = set;
             shared.m_setStatusEffect = bonus;
             shared.m_maxQuality = TableMaxLevel;
+            PieceStats stats = Stats(piece, prefix == FirePrefix ? HitData.DamageType.Fire : HitData.DamageType.Lightning);
+            shared.m_armor = stats.Armor;
+            shared.m_armorPerLevel = stats.ArmorPerLevel;
+            shared.m_eitrRegenModifier = stats.EitrRegen;
+            shared.m_maxDurability = stats.Durability;
+            shared.m_durabilityPerLevel = stats.DurabilityPerLevel;
+            shared.m_weight = stats.Weight;
+            shared.m_movementModifier = stats.Movement;
+            shared.m_damageModifiers = new List<HitData.DamageModPair>(stats.Resistances);
             if (prefix == FirePrefix)
             {
                 colors?.Apply(armor, shared);
-                // Fire for the Firecaller's, where the Stormcaller's cloak resists lightning
-                for (int i = 0; i < shared.m_damageModifiers.Count; i++)
-                {
-                    HitData.DamageModPair modifier = shared.m_damageModifiers[i];
-                    if (modifier.m_type == HitData.DamageType.Lightning)
-                    {
-                        modifier.m_type = HitData.DamageType.Fire;
-                        shared.m_damageModifiers[i] = modifier;
-                    }
-                }
             }
 
             CustomItem item = new CustomItem(armor, false, new ItemConfig
@@ -220,7 +274,7 @@ namespace NhxMagicWeapons.Armor
                 CraftingStation = CraftingStations.GaldrTable,
                 RepairStation = CraftingStations.GaldrTable,
                 MinStationLevel = StationLevel,
-                Requirements = Requirements(piece),
+                Requirements = Requirements(piece, prefix == FirePrefix ? "JuteRed" : "JuteBlue"),
             });
             // As the game's recipes from the Mistlands on: crafting and the table's upgrade don't take the idol (at a
             // crafting station, upgrader requirements don't count), but it's what lists the piece at the Forge of
