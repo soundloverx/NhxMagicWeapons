@@ -10,6 +10,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
     // The attack creates it on the caster's game only (Attack.FireProjectileBurst; it has no ZNetView). Setup creates the
     // flames at the staff's head (networked, so every game sees and hears them, made as long as the reach), deals the
     // damage and removes this object.
+    // With the whole Firecaller's Regalia on (its set's status effect), the flames are blue and reach farther.
     internal class FlameJet : MonoBehaviour, IProjectile
     {
         // The reach at m_firstLevel, where the flamethrower comes, and m_reachPerLevel more each level, up to m_maxLevel
@@ -24,22 +25,35 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         public float m_adrenaline = 0.5f;
         // The flames, created at the staff's head (networked, FlameLook)
         public GameObject m_flames;
+        // For a caster with this status effect (the hash of its name): the blue flames (as m_flames), and the reach times
+        // m_setReach
+        public int m_setStatus;
+        public GameObject m_blueFlames;
+        public float m_setReach = 1f;
 
-        internal float Reach(int level)
+        // The reach for a staff of this level in this caster's hands (none: as without the set)
+        internal float Reach(int level, Character caster)
         {
-            return m_reach + m_reachPerLevel * (Mathf.Clamp(level, m_firstLevel, m_maxLevel) - m_firstLevel);
+            float reach = m_reach + m_reachPerLevel * (Mathf.Clamp(level, m_firstLevel, m_maxLevel) - m_firstLevel);
+            return HasSet(caster) ? reach * m_setReach : reach;
+        }
+
+        private bool HasSet(Character caster)
+        {
+            return caster && m_setStatus != 0 && caster.GetSEMan().HaveStatusEffect(m_setStatus);
         }
 
         public void Setup(Character owner, Vector3 velocity, float hitNoise, HitData hitData, ItemDrop.ItemData item, ItemDrop.ItemData ammo)
         {
-            float reach = Reach(item != null ? item.m_quality : 1);
+            float reach = Reach(item != null ? item.m_quality : 1, owner);
             Transform tip = StaffHits.FindTip(owner);
             Vector3 origin = tip ? tip.position : transform.position;
             Vector3 dir = StaffHits.AimAtCrosshair(owner, origin, velocity.normalized, reach);
 
-            if (m_flames)
+            GameObject flames = m_blueFlames && HasSet(owner) ? m_blueFlames : m_flames;
+            if (flames)
             {
-                FlameLook.SetReach(Instantiate(m_flames, origin, Quaternion.LookRotation(dir)), reach);
+                FlameLook.SetReach(Instantiate(flames, origin, Quaternion.LookRotation(dir)), reach);
             }
 
             bool hitCharacter = false;

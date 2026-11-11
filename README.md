@@ -1,12 +1,14 @@
 # NhxMagicWeapons
 
-A private mod for our server: magic weapons made with Magic Supremacy's models and effects (https://valheim.hexium.gg/mods/Dreanegade/Magic_Supremacy). Not published.
+A private mod for our server: magic weapons and armor made with Magic Supremacy's models and effects (https://valheim.hexium.gg/mods/Dreanegade/Magic_Supremacy). Not published.
 
 Both staves are made at the Galdr Table, use Elemental Magic, and can be refined at the Forge of Potential with black marble battle idols, like the game's Mistlands staves. They're meant to go up to level 20: their power, their look and their effects grow with each level. Their durability is 400, and 100 more each level.
 
 Their main attacks hit where your crosshair is, at once: no projectile to dodge or lead. Their attacks go through your friends and tames and don't hurt you (unless you've turned PvP on), and they damage buildings, as the game's staves do. Their eitr costs go down by up to a third with your Elemental Magic skill.
 
 Damage, the same for both staves in all: 155 at level 1, 190 at 5, 243 at 10, 317 at 15, 392 at 20. From level 5 it adds spirit damage, which the Ashlands' Charred are weak to, and from level 10 more fire, which most of the Deep North's creatures are weak to.
+
+Every hit also lowers the enemy's resistance to the staff's element (lightning or fire) by one step for 3 seconds, renewed by each hit: very resistant becomes resistant, normal becomes weak, and so on. Immune stays immune. With the staff's armor set on, each hit lowers it one more step, down to very weak.
 
 ## Staff of Storms
 
@@ -26,6 +28,32 @@ A fire staff, made from 20 Yggdrasil wood, 16 refined eitr and 4 surtling cores;
 - **Secondary attack (middle mouse, held), from level 5: flamethrower.** A cone of flames burning everything in front of you for 15% of the beam's damage five times a second, at 4 eitr each (20 a second). It reaches 7 m at level 5, a meter more every 3 levels, 12 m at 20.
 
 The staff is Magic Supremacy's Incinerator, with its explosion and flames.
+
+## Stormcaller's Raiment and Firecaller's Regalia
+
+Two Ashlands armor sets of four pieces (hood, robe, greaves, cloak), Magic Supremacy's Stormcaller set: Stormcaller's Raiment as it is, and the Firecaller's Regalia in red. Both are made at the Galdr Table with three of its extensions (level 4), and repaired there. Their one upgrade there needs the fourth (level 5); after that, they refine at the Forge of Potential with flametal protection idols.
+
+| Piece | Crafting | Upgrade at the table |
+| --- | --- | --- |
+| Hood | 2 molten cores, 1 asksvin skull, 10 asksvin hides | 10 asksvin hides, 2 celestial feathers |
+| Robe | 2 molten cores, 1 asksvin ribcage, 10 flametal | 10 flametal, 2 celestial feathers |
+| Greaves | 2 molten cores, 1 asksvin pelvis, 10 flametal | 10 flametal, 2 celestial feathers |
+| Cloak | 10 asksvin hides, 10 flametal, 4 celestial feathers | 10 flametal, 2 celestial feathers |
+
+Each piece has 22 armor and 2 more a level (the cloak 3, and 1 more), and eitr regen: +32% the hood, +54% the robe and the greaves, +12% the cloak (+152% in all). The cloak makes you 9% faster and resistant to lightning (the Firecaller's to fire), and the greaves slightly resistant to frost.
+
+The whole set (all four pieces) gives +100% eitr regen (+252% with the pieces'; like any eitr regen, it stops while you attack), and +1% lightning damage (Stormcaller) or fire damage (Firecaller) for each level of its least upgraded piece. The sets' crystals glow fully only while you have the whole set on and hold its staff.
+
+### Stormcaller's Raiment, with the Staff of Storms
+
+- **Eye of the Storm** (the secondary attack, held, from level 5): a storm cloud forms over where you aim, up to 60 m away, and follows your aim. Every second, for 30 eitr, it rains lightning across its 7 m: 3 bolts at level 5, one more every 3 levels, up to 7 from level 17. Each strikes an enemy under the cloud, or the ground, and hits everything within 3.5 m for the staff's damage, each enemy once a second. The first enemy struck each second chains as the bolt does.
+- **Lightning Step:** a dodge with the staff in hand turns you into lightning: you blink up to 12 m the way you dodge, for 20 eitr instead of the roll's stamina, stopping short of walls, steep ground and deep water. Enemies on the way take half the bolt's damage, and the farthest one chains. Without the eitr, or with no room, you roll as usual.
+- The robe's crystal crackles with small arcs, faster while the storm is up.
+
+### Firecaller's Regalia, with the Wrath of Muspelheim
+
+- **Channelled beam:** hold the attack and the beam stays on, as a thread from the staff's head that sticks to the first enemy it touches and follows it around. Every second, for the beam's 30 eitr, the enemy takes the beam's hit and blast, and fire tendrils shoot from it to every other enemy within 20 m in its sight, each taking the full hit and blasting too. When the enemy dies, goes beyond 50 m or out of sight for half a second, the beam takes the next one where you aim. With no enemy held, it burns what it touches as the beam does.
+- **Blue flamethrower:** the flamethrower burns blue and reaches 20% farther (8.4 m at level 5, 14.4 m at 20).
 
 ## Installing
 

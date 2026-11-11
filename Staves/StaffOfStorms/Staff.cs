@@ -8,10 +8,14 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
 {
     // Staff of Storms: Magic Supremacy's Thundersurge (its Stormcaller staff) with attacks of its own. The attack casts a
     // lightning bolt that hits at once; the secondary attack (middle mouse) calls lightning down on the spot aimed at.
+    // With the whole Stormcaller's Raiment on, the secondary attack is the Eye of the Storm (StormEye) and a dodge with the
+    // staff in hand is Lightning Step (LightningStep).
     // This builds and registers the staff, its prefabs and its recipe; all its numbers are here.
     internal static class Staff
     {
-        private const string ItemName = "NhxStaffStorms";
+        internal const string ItemName = "NhxStaffStorms";
+        internal const string NameKey = "$item_nhx_staffstorms";
+        private const string WeaknessName = "SE_NhxLightningWeakness";
         private const string BoltName = "NhxStormBolt";
         private const string CallName = "NhxStormCall";
         private const string StrikeName = "NhxStormStrike";
@@ -19,6 +23,10 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         private const string ImpactName = "NhxStormImpact";
         private const string BuzzName = "NhxStormBuzz";
         private const string LookName = "NhxStormLook";
+        private const string EyeName = "NhxStormEye";
+        private const string EyeTickName = "NhxStormEyeTick";
+        private const string EyeStrikeName = "NhxStormEyeStrike";
+        private const string RainBoltName = "NhxStormRainBolt";
 
         // From Magic Supremacy. Of their effects we keep the sounds and lights: their particles were too much on top of the
         // bolt (a shockwave sphere and sparks flying every way at the staff's tip, and the same at twice the size where it
@@ -27,6 +35,9 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         private const string SparksPrefab = "fx_stormcaller_staff_shock_DO";             // Thundersurge's sparks and buzz as it fires; its sparks' material draws the bolt
         private const string CracklePrefab = "fx_stormcaller_staff_sphere_trap_land_DO"; // an electric crackle (Tempest Eye's trap landing)
         private const string ImpactPrefab = "fx_stormcaller_staff_sphere_hit_DO";        // Tempest Eye's orb hitting: a bang and a flash
+        private const string HeldPrefab = "StaffFirecallerBlaster_DO";                   // the Incinerator: its held attack, for the storm
+        private const string CloudEffect = "fx_frostcaller_staff_shard_hit_DO";          // its smoke's material (a soft grey puff), for the storm's cloud
+        private const string CloudChild = "smoke";
 
         // From the game
         private const string BaseStaff = "StaffFireball"; // Staff of Embers
@@ -122,6 +133,36 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         private const float AttackForce = 40f;
         // The Staff of Embers' durability (its base and per level) times this
         private const float DurabilityBoost = 2f;
+        // With the whole Stormcaller's Raiment on (the user's picks, 2026-11-10; the numbers picked here):
+        // Eye of the Storm, the secondary attack held (the Incinerator's looping attack): a cloud 16 m over the spot aimed
+        // at, drifting after the crosshair at up to 12 m/s, within the strike's 60 m; every second, for 30 eitr (as the
+        // Wrath of Muspelheim's channelled beam), a rain of bolts from it across its 7 m (below), each striking everything
+        // within the strike's 3.5 m for the bolt's damage (the strike alone: 2.2 times it, for 50 eitr), and chaining from
+        // the first enemy struck by the bolt's rules. Each second's first bolt shakes the camera half as hard as the
+        // strike, 20 m around
+        private const float StormEitr = 30f;
+        private const float StormInterval = 1f;
+        private const float StormDamage = 1f;
+        private const float StormRadius = 7f;
+        private const float StormSpeed = 12f;
+        private const float StormHeight = 16f;
+        private const float StormShake = 0.5f;
+        private const float StormShakeRange = 20f;
+        // Its rain (the user, 2026-11-11: "rain lightning across a larger area under the cloud"; the numbers picked here):
+        // 3 bolts a second at level 5, one more every 3 levels (as the strike's bolts side by side), 7 from level 17, one
+        // bolt each, spread over the second and across the cloud; each thing struck once a second at most
+        private const int StormFirstBolts = 3;
+        private const int StormLevelsPerBolt = 3;
+        private const int StormMaxBolts = 7;
+        // Lightning Step, a dodge with the staff in hand: 12 m (the user's), for 20 eitr instead of the roll's stamina (as
+        // Magic Supremacy's Stormcaller air dash), the enemies within 1.5 m of the way taking half the bolt's hit
+        private const float StepDistance = 12f;
+        private const float StepEitr = 20f;
+        private const float StepDamage = 0.5f;
+        private const float StepWidth = 1.5f;
+
+        // How the staff's lightning is drawn, for the Stormcaller's Raiment's crackle (ArmorCrackle)
+        internal static LightningLook Look { get; private set; }
 
         internal static void Add()
         {
@@ -135,14 +176,24 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
 
             Transform container = StaffEffects.Container;
             LightningLook look = CreateLook(container);
+            Look = look;
 
             GameObject buzz = StaffEffects.AddWithoutParticles(BuzzName, SparksPrefab);
             GameObject crackle = StaffEffects.AddWithoutParticles(CrackleName, CracklePrefab);
             GameObject impact = StaffEffects.AddWithoutParticles(ImpactName, ImpactPrefab);
-            GameObject strike = AddStrike(look);
+            GameObject strike = AddStrike(look, StrikeName, StrikeHeight, 1f, 30f);
+            GameObject eyeStrike = AddStrike(look, EyeStrikeName, StormHeight, StormShake, StormShakeRange);
+            GameObject rainBolt = AddRainBolt(look);
+            // The storm's first bolt each second is one bolt too: the rain spreads them out
+            StrikeLightning eyeLightning = eyeStrike ? eyeStrike.GetComponent<StrikeLightning>() : null;
+            if (eyeLightning)
+            {
+                eyeLightning.m_oneStrand = true;
+            }
 
             GameObject bolt = AddBolt(container, look, buzz, crackle, impact);
             GameObject call = CreateCall(container, crackle, strike);
+            GameObject eyeTick = CreateEyeTick(container, AddEye(container, eyeStrike, rainBolt, bolt));
 
             GameObject staff = PrefabManager.Instance.CreateClonedPrefab(ItemName, model);
             GameObject tip = new GameObject(StaffHits.TipName);
@@ -152,7 +203,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
 
             ItemDrop.ItemData.SharedData shared = staff.GetComponent<ItemDrop>().m_itemData.m_shared;
             ItemDrop.ItemData.SharedData baseShared = embers.GetComponent<ItemDrop>().m_itemData.m_shared;
-            shared.m_name = "$item_nhx_staffstorms";
+            shared.m_name = NameKey;
             shared.m_description = "$item_nhx_staffstorms_description   ";
             shared.m_damages = new HitData.DamageTypes { m_lightning = Lightning };
             shared.m_damagesPerLevel = new HitData.DamageTypes { m_lightning = LightningPerLevel };
@@ -162,6 +213,10 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
                 new LevelDamage.Step(SpiritLevel, new HitData.DamageTypes { m_spirit = Spirit }, new HitData.DamageTypes { m_spirit = SpiritPerLevel }),
                 new LevelDamage.Step(FireLevel, new HitData.DamageTypes { m_fire = Fire }, new HitData.DamageTypes { m_fire = FirePerLevel }));
             shared.m_attackForce = AttackForce;
+            // Its hits leave what they hit a step weaker to lightning for a while (ElementWeakness)
+            Sprite icon = shared.m_icons != null && shared.m_icons.Length > 0 ? shared.m_icons[0] : null;
+            shared.m_attackStatusEffect = ElementWeakness.Add(WeaknessName, "$se_nhx_lightningweakness", "$se_nhx_lightningweakness_tooltip", HitData.DamageType.Lightning, false, icon);
+            shared.m_attackStatusEffectChance = 1f;
             // The bolt's chain lightning, for the staff's level
             shared.m_projectileToolTip = true;
             // The rest as the Staff of Embers
@@ -203,8 +258,32 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             strikeAttack.m_launchAngle = 0f;
             shared.m_secondaryAttack = strikeAttack;
             SecondaryUnlock.Add(shared, StrikeLevel);
-            // The strike costs its own eitr, not the bolt's
+            // The strike costs its own eitr, not the bolt's (and the storm's shots theirs)
             AttackEitr.Add(shared);
+            // A quick click on the storm still calls it once
+            FirstShot.Add(shared);
+
+            // With the whole Stormcaller's Raiment on: the storm, and Lightning Step
+            GameObject held = Plugin.Assets.LoadAsset<GameObject>(HeldPrefab);
+            Attack heldAttack = held ? held.GetComponent<ItemDrop>().m_itemData.m_shared.m_secondaryAttack : null;
+            if (heldAttack != null && eyeTick)
+            {
+                StormEye.SetUp(shared, Armor.StormcallerArmor.StormSetBonus,
+                    WrathOfMuspelheim.Staff.HeldAttack(heldAttack, eyeTick, StormEitr, StormInterval, StormDamage));
+            }
+            else
+            {
+                Plugin.Log.LogWarning($"{HeldPrefab} isn't in the asset bundle: no Eye of the Storm.");
+            }
+            LightningStep.s_staff = shared.m_name;
+            LightningStep.s_status = Armor.StormcallerArmor.StormSetBonus.GetStableHashCode();
+            LightningStep.s_bolt = bolt;
+            LightningStep.s_leaveEffects = new[] { crackle };
+            LightningStep.s_landEffects = new[] { crackle, impact };
+            LightningStep.s_distance = StepDistance;
+            LightningStep.s_eitr = StepEitr;
+            LightningStep.s_damage = StepDamage;
+            LightningStep.s_width = StepWidth;
 
             CustomItem item = new CustomItem(staff, false, new ItemConfig
             {
@@ -272,10 +351,12 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         // a fixed 400 at the center and 10 around, where the staff deals its own; its bolts ("Lighting", one going up from
         // 10 m, and "Lighting_rod", four thin ones coming down from there) are replaced with ours (StrikeLightning), which
         // grow with the staff's level. It keeps its ground wave, sparks, lights, thunder and camera shake, though shorter
-        // and softer: it lasted 10 s (its lights fade after 4), and shook the camera hard 40 m around
-        private static GameObject AddStrike(LightningLook look)
+        // and softer: it lasted 10 s (its lights fade after 4), and shook the camera hard 40 m around. Its lightning falls
+        // from `height`, and it shakes the camera with `shake` within `shakeRange`: the strike's, and the storm's (from its
+        // cloud, softer, as it strikes every second)
+        private static GameObject AddStrike(LightningLook look, string name, float height, float shake, float shakeRange)
         {
-            GameObject strike = PrefabManager.Instance.CreateClonedPrefab(StrikeName, StrikeBase);
+            GameObject strike = PrefabManager.Instance.CreateClonedPrefab(name, StrikeBase);
             if (!strike)
             {
                 Plugin.Log.LogWarning($"The game has no {StrikeBase}: the Staff of Storms' strikes are invisible.");
@@ -299,7 +380,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             }
             StrikeLightning lightning = strike.AddComponent<StrikeLightning>();
             lightning.m_look = look;
-            lightning.m_height = StrikeHeight;
+            lightning.m_height = height;
             lightning.m_firstLevel = StrikeLevel;
             lightning.m_levelsPerStrand = StrikeLevelsPerStrand;
             lightning.m_maxStrands = StrikeMaxStrands;
@@ -312,11 +393,72 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             CamShaker shaker = strike.GetComponent<CamShaker>();
             if (shaker)
             {
-                shaker.m_strength = 1f;
-                shaker.m_range = 30f;
+                shaker.m_strength = shake;
+                shaker.m_range = shakeRange;
             }
             PrefabManager.Instance.AddPrefab(strike);
             return strike;
+        }
+
+        // The storm's bolts but the first of each second: its lightning, one bolt as the strike's, with a crackle (the bolt's
+        // cast sound) and nothing else: no lights (the cloud flashes for each), ground wave or camera shake
+        private static GameObject AddRainBolt(LightningLook look)
+        {
+            GameObject rain = StaffEffects.AddWithoutParticles(RainBoltName, CracklePrefab);
+            if (!rain)
+            {
+                return null;
+            }
+            StrikeLightning lightning = rain.AddComponent<StrikeLightning>();
+            lightning.m_look = look;
+            lightning.m_height = StormHeight;
+            lightning.m_firstLevel = StrikeLevel;
+            lightning.m_levelsPerStrand = StrikeLevelsPerStrand;
+            lightning.m_maxStrands = StrikeMaxStrands;
+            lightning.m_scale = StrikeScale;
+            lightning.m_oneStrand = true;
+            // Long enough for its lightning to show
+            TimedDestruction timed = rain.GetComponent<TimedDestruction>();
+            if (timed && timed.m_timeout < 1.5f)
+            {
+                timed.m_timeout = 1.5f;
+            }
+            return rain;
+        }
+
+        // The Eye of the Storm (StormEye): networked, so that every game draws its cloud
+        private static GameObject AddEye(Transform container, GameObject strike, GameObject rainBolt, GameObject bolt)
+        {
+            GameObject go = new GameObject(EyeName);
+            go.transform.SetParent(container, false);
+            go.AddComponent<ZNetView>();
+            StormEye eye = go.AddComponent<StormEye>();
+            eye.m_range = StrikeRange;
+            eye.m_radius = StormRadius;
+            eye.m_strike = strike;
+            eye.m_rainBolt = rainBolt;
+            eye.m_strikeRadius = StrikeRadius;
+            eye.m_firstLevel = StrikeLevel;
+            eye.m_firstBolts = StormFirstBolts;
+            eye.m_levelsPerBolt = StormLevelsPerBolt;
+            eye.m_maxBolts = StormMaxBolts;
+            eye.m_interval = StormInterval;
+            eye.m_bolt = bolt;
+            eye.m_speed = StormSpeed;
+            eye.m_height = StormHeight;
+            eye.m_tickTimeout = StormInterval * 1.6f;
+            eye.m_cloudMaterial = LineMaterials.Copy(CloudEffect, CloudChild);
+            PrefabManager.Instance.AddPrefab(go);
+            return go;
+        }
+
+        // The storm's attack's shots: only on the caster's game, for the moment it takes; not registered
+        private static GameObject CreateEyeTick(Transform container, GameObject eye)
+        {
+            GameObject go = new GameObject(EyeTickName);
+            go.transform.SetParent(container, false);
+            go.AddComponent<StormEyeTick>().m_eye = eye;
+            return go;
         }
 
         // Networked, so that every game draws it

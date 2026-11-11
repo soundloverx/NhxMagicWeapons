@@ -1,5 +1,8 @@
 # Changelog
 
+## v1.1.0
+- added Stormcaller's Raiment and Firecaller's Regalia, two Ashlands armor sets which interact with the staves
+
 ## v1.0.2
 - Fixed Jewelcrafting's eitr discounts (Magical Bargain, Apotheosis) not applying to the Staff of Storms and Wrath of Muspelheim
 

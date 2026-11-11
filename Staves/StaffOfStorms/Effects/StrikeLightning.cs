@@ -19,6 +19,8 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms.Effects
         public int m_levelsPerStrand = 3;
         public int m_maxStrands = 5;
         public float m_scale = 3f;
+        // One bolt only, as wide as one of the level's (the storm's rain, which spreads them out instead)
+        public bool m_oneStrand;
 
         private static readonly int s_levelKey = "nhx_strike_level".GetStableHashCode();
 
@@ -66,6 +68,10 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms.Effects
             LightningSize size = m_look.Size(level, m_firstLevel, m_levelsPerStrand, m_maxStrands);
             size.m_strandSize *= m_scale;
             size.m_glowSize *= m_scale;
+            if (m_oneStrand)
+            {
+                size.m_strands = 1;
+            }
 
             // The effect has lights of its own
             m_arcs = new LightningArcs(transform, m_look, m_duration) { m_jag = m_jag, m_maxJag = m_maxJag, m_lights = false };

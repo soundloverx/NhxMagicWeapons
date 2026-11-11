@@ -11,6 +11,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
     // The attack creates it on the caster's game (Attack.FireProjectileBurst), and calls Setup there: that game finds what
     // it hits, deals the damage, creates the shot's sound and stores the beam's end, its caster, the staff's level and
     // whether it hit something in its ZDO. Every game (that one too) then draws the beam and its blast from the ZDO.
+    // With the Firecaller's Regalia (its set bonus), each shot is a tick of the caster's channelled beam instead
+    // (FireChannel), and this draws nothing.
     internal class FireBeam : MonoBehaviour, IProjectile
     {
         public float m_range = 50f;
@@ -41,6 +43,10 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         // The staff's secondary attack, told in its tooltip: from which level, and its reach then
         public FlameJet m_flames;
 
+        // The channelled beam (a FireChannel prefab), for a caster with this status effect (the hash of its name)
+        public GameObject m_channel;
+        public int m_channelStatus;
+
         private static readonly int s_endKey = "nhx_beam_end".GetStableHashCode();
         private static readonly KeyValuePair<int, int> s_casterKey = ZDO.GetHashZDOID("nhx_beam_caster");
         private static readonly int s_levelKey = "nhx_beam_level".GetStableHashCode();
@@ -50,6 +56,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private float m_age;
         // From when the ZDO has the beam's end
         private FireBeams m_beams;
+        // A tick of a channelled beam: nothing to show
+        private bool m_channelled;
 
         private void Awake()
         {
@@ -65,12 +73,20 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             from.y = spawn.y;
             int level = item != null ? item.m_quality : 1;
 
+            if (m_channel && m_channelStatus != 0 && owner.GetSEMan().HaveStatusEffect(m_channelStatus))
+            {
+                FireChannel.Tick(m_channel, owner, hitData, level, hitNoise);
+                m_channelled = true;
+                return;
+            }
+
             bool hit = StaffHits.Trace(owner, from, spawn, end, out Vector3 point, out Collider collider);
             if (hit)
             {
                 end = point;
                 bool hitCharacter = StaffHits.Damage(owner, hitData, collider, point, dir, out Character struck) && struck;
-                hitCharacter |= Blast(owner, hitData, point, dir, BlastRadius(level), collider ? Projectile.FindHitObject(collider) : null);
+                HashSet<GameObject> done = new HashSet<GameObject> { collider ? Projectile.FindHitObject(collider) : null };
+                hitCharacter |= Blast(owner, hitData, point, dir, BlastRadius(level), done);
                 if (hitCharacter)
                 {
                     StaffHits.OnCharacterHit(owner, hitData);
@@ -88,7 +104,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             zdo.Set(s_hitKey, hit);
         }
 
-        // Shown in the staff's tooltip for its level, after a blank line (ItemData.GetTooltip, if m_projectileToolTip)
+        // Shown in the staff's tooltip for its level, after a blank line (ItemData.GetTooltip, if m_projectileToolTip). The
+        // flamethrower's reach is the local player's: farther with the Firecaller's Regalia on
         public string GetTooltipString(int itemQuality)
         {
             string text = $"$item_nhx_blastradius: <color=orange>{BlastRadius(itemQuality):0.#} m</color>";
@@ -96,26 +113,25 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             {
                 text += itemQuality < m_flames.m_firstLevel
                     ? $"\n$item_nhx_flamethrower: <color=orange>$item_nhx_fromlevel {m_flames.m_firstLevel}</color>"
-                    : $"\n$item_nhx_flamereach: <color=orange>{m_flames.Reach(itemQuality):0.#} m</color>";
+                    : $"\n$item_nhx_flamereach: <color=orange>{m_flames.Reach(itemQuality, Player.m_localPlayer):0.#} m</color>";
             }
             return text;
         }
 
-        private float BlastRadius(int level)
+        internal float BlastRadius(int level)
         {
             return m_blastRadius + m_blastRadiusPerLevel * (Mathf.Clamp(level, 1, m_maxBlastLevel) - 1);
         }
 
-        // Everything within `radius` of the point but `struck` (what the beam hit) takes the blast's share of the hit,
-        // pushed away from the point; building pieces too, as from the game's exploding projectiles. Returns whether it
-        // hit a character
-        private bool Blast(Character owner, HitData hitData, Vector3 point, Vector3 dir, float radius, GameObject struck)
+        // Everything within `radius` of the point but what's `done` (what the beam hit; what's hit is added) takes the
+        // blast's share of the hit, pushed away from the point; building pieces too, as from the game's exploding
+        // projectiles. Returns whether it hit a character
+        internal bool Blast(Character owner, HitData hitData, Vector3 point, Vector3 dir, float radius, HashSet<GameObject> done)
         {
             HitData hit = hitData.Clone();
             hit.m_damage.Modify(m_blastDamage);
             hit.m_pushForce *= m_blastDamage;
             bool hitCharacter = false;
-            HashSet<GameObject> done = new HashSet<GameObject> { struck };
             foreach (Collider collider in Physics.OverlapSphere(point, radius, StaffHits.RayMask))
             {
                 GameObject target = Projectile.FindHitObject(collider);
@@ -143,6 +159,11 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         {
             if (!m_nview.IsValid())
             {
+                return;
+            }
+            if (m_channelled)
+            {
+                ZNetScene.instance.Destroy(gameObject);
                 return;
             }
             // On the other games, from when the ZDO has the beam's end
@@ -174,20 +195,31 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             // From the staff as it moves, or from where the attack created the beam if the caster isn't around here
             m_beams = new FireBeams(transform, m_look, m_duration, tip, transform.position, end, m_look.Size(level, m_levelsPerStrand, m_maxStrands));
 
-            if (zdo.GetBool(s_hitKey) && m_blast)
+            if (zdo.GetBool(s_hitKey))
             {
-                GameObject blast = Instantiate(m_blast, end, Quaternion.identity);
-                float scale = BlastRadius(level) / m_blastEffectRadius;
-                StaffEffects.Scale(blast, scale);
-                // As made, every shot would shake the camera hard 50 m around
-                CamShaker shaker = blast.GetComponentInChildren<CamShaker>();
-                if (shaker)
-                {
-                    shaker.m_strength *= m_blastShake * Mathf.Min(1f, scale);
-                    shaker.m_range = Mathf.Min(shaker.m_range, m_blastShakeRange);
-                }
+                ShowBlast(end, level, 1f);
             }
             return true;
+        }
+
+        // The blast's effect at `point`, for a staff at `level`, on this game, shaking the camera by `shake` (0: not at
+        // all) of its share
+        internal void ShowBlast(Vector3 point, int level, float shake)
+        {
+            if (!m_blast)
+            {
+                return;
+            }
+            GameObject blast = Instantiate(m_blast, point, Quaternion.identity);
+            float scale = BlastRadius(level) / m_blastEffectRadius;
+            StaffEffects.Scale(blast, scale);
+            // As made, every shot would shake the camera hard 50 m around
+            CamShaker shaker = blast.GetComponentInChildren<CamShaker>();
+            if (shaker)
+            {
+                shaker.m_strength *= m_blastShake * Mathf.Min(1f, scale) * shake;
+                shaker.m_range = Mathf.Min(shaker.m_range, m_blastShakeRange);
+            }
         }
     }
 }

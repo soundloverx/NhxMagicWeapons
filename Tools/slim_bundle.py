@@ -26,6 +26,10 @@ KEEP = [
     "sfx_firecaller_staff_blaster_shot_DO",      # its beam's shot
     "fx_firecallercaller_staff_blaster_hit_DO",  # its blast, and the embers rising from its head
     "fx_firecaller_staff_thrower_DO",            # its flamethrower's flames
+    "ArmorStormcallerHelmet_DO",                 # the Stormcaller set: Stormcaller's Raiment, and in red (Tools\
+    "ArmorStormcallerChest_DO",                  # recolor_armor.py) the Firecaller's Regalia
+    "ArmorStormcallerLegs_DO",
+    "ArmorStormcallerCape_DO",
 ]
 ALIGN = 16
 

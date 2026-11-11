@@ -93,11 +93,18 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Armor\ArmorCrackle.cs" />
+    <Compile Include="Armor\ArmorGlow.cs" />
+    <Compile Include="Armor\FirecallerColors.cs" />
+    <Compile Include="Armor\LevelSetBonus.cs" />
+    <Compile Include="Armor\StormcallerArmor.cs" />
     <Compile Include="AudioRouting.cs" />
     <Compile Include="ItemLevelCommand.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RecoloredTextures.cs" />
     <Compile Include="Staves\AttackEitr.cs" />
+    <Compile Include="Staves\ElementWeakness.cs" />
     <Compile Include="Staves\FirstShot.cs" />
     <Compile Include="Staves\LevelDamage.cs" />
     <Compile Include="Staves\LevelLook.cs" />
@@ -110,16 +117,23 @@
     <Compile Include="Staves\StaffOfStorms\Effects\LightningLook.cs" />
     <Compile Include="Staves\StaffOfStorms\Effects\StaffLevelLook.cs" />
     <Compile Include="Staves\StaffOfStorms\Effects\StaffModel.cs" />
+    <Compile Include="Staves\StaffOfStorms\Effects\StormCloud.cs" />
     <Compile Include="Staves\StaffOfStorms\Effects\StrikeLightning.cs" />
     <Compile Include="Staves\StaffOfStorms\LightningBolt.cs" />
+    <Compile Include="Staves\StaffOfStorms\LightningStep.cs" />
     <Compile Include="Staves\StaffOfStorms\LightningStrike.cs" />
     <Compile Include="Staves\StaffOfStorms\Staff.cs" />
+    <Compile Include="Staves\StaffOfStorms\StormEye.cs" />
+    <Compile Include="Staves\StaffOfStorms\StormEyeTick.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\BeamLook.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\BlueFlames.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\ChannelSound.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\FireBeams.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\FlameLook.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\StaffLevelLook.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\StaffModel.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\FireBeam.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\FireChannel.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\FlameJet.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Staff.cs" />
   </ItemGroup>
@@ -130,6 +144,16 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Assets\muspelheim_parts.bin">
       <LogicalName>muspelheim_parts</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\firecaller_regalia">
+      <LogicalName>firecaller_regalia</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\muspel_channel_sound">
+      <LogicalName>muspel_channel_sound</LogicalName>
+    </EmbeddedResource>
+    <!-- The flamethrower's blue flames' textures (Tools\recolor_flames.py) -->
+    <EmbeddedResource Include="Assets\blue_flames">
+      <LogicalName>blue_flames</LogicalName>
     </EmbeddedResource>
     <!-- What the mod uses of Magic Supremacy's asset bundle (Tools\slim_bundle.py), loaded from the DLL -->
     <EmbeddedResource Include="Assets\nhx_magic_weapons">

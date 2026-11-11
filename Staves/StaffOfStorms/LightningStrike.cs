@@ -25,10 +25,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         {
             Vector3 spawn = transform.position;
             Vector3 dir = StaffHits.AimAtCrosshair(owner, spawn, velocity.normalized, m_range);
-            Vector3 from = owner.GetCenterPoint();
-            from.y = spawn.y;
-            StaffHits.Trace(owner, from, spawn, spawn + dir * m_range, out Vector3 aimed, out _);
-            Vector3 point = Ground(aimed);
+            Vector3 point = Aimed(owner, spawn, dir, m_range);
 
             Transform tip = StaffHits.FindTip(owner);
             StaffEffects.Create(m_castEffects, tip ? tip.position : spawn, Quaternion.LookRotation(dir));
@@ -38,9 +35,23 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
                 StrikeLightning.SetLevel(Instantiate(m_strike, point, Quaternion.identity), item != null ? item.m_quality : 1);
             }
 
+            if (HitArea(owner, hitData, point, m_radius, dir))
+            {
+                StaffHits.OnCharacterHit(owner, hitData);
+            }
+            BaseAI.DoProjectileHitNoise(point, hitNoise, owner);
+
+            Destroy(gameObject);
+        }
+
+        // Everything within `radius` of `point` but the caster and their friends takes the hit, pushed away from it
+        // (along `dir` if right on it); building pieces too. Returns whether it hit a character. Also the storm's strikes
+        // Each object once, also across several calls sharing `done` (the storm's bolts of one second)
+        internal static bool HitArea(Character owner, HitData hitData, Vector3 point, float radius, Vector3 dir, HashSet<GameObject> done = null)
+        {
             bool hitCharacter = false;
-            HashSet<GameObject> done = new HashSet<GameObject>();
-            foreach (Collider collider in Physics.OverlapSphere(point, m_radius, StaffHits.RayMask))
+            done = done ?? new HashSet<GameObject>();
+            foreach (Collider collider in Physics.OverlapSphere(point, radius, StaffHits.RayMask))
             {
                 GameObject target = Projectile.FindHitObject(collider);
                 if (!target || !done.Add(target))
@@ -61,13 +72,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
                     hitCharacter = true;
                 }
             }
-            if (hitCharacter)
-            {
-                StaffHits.OnCharacterHit(owner, hitData);
-            }
-            BaseAI.DoProjectileHitNoise(point, hitNoise, owner);
-
-            Destroy(gameObject);
+            return hitCharacter;
         }
 
         public string GetTooltipString(int itemQuality)
@@ -77,7 +82,17 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
 
         // Down to what's under the spot (ground, rock, roof), so the strike lands on something when aimed at a creature
         // or at the sky
-        private static Vector3 Ground(Vector3 point)
+        // The ground under what's in line from `spawn` along `dir` within `range` (or under its end): where a strike aimed
+        // that way lands. Also the storm's aim
+        internal static Vector3 Aimed(Character owner, Vector3 spawn, Vector3 dir, float range)
+        {
+            Vector3 from = owner.GetCenterPoint();
+            from.y = spawn.y;
+            StaffHits.Trace(owner, from, spawn, spawn + dir * range, out Vector3 aimed, out _);
+            return Ground(aimed);
+        }
+
+        internal static Vector3 Ground(Vector3 point)
         {
             if (Physics.Raycast(point + Vector3.up * 0.5f, Vector3.down, out RaycastHit hit, GroundSearch, StaffHits.GroundMask))
             {

@@ -20,7 +20,7 @@ namespace NhxMagicWeapons
     {
         internal const string PluginGuid = "NhxMagicWeapons";
         private const string PluginName = "NhxMagicWeapons";
-        private const string PluginVersion = "1.0.2";
+        private const string PluginVersion = "1.1.0";
 
         // What the mod uses of Magic Supremacy 3.1.5's asset bundle (Tools\slim_bundle.py), embedded in the DLL
         private const string BundleResource = "nhx_magic_weapons";
@@ -46,18 +46,20 @@ namespace NhxMagicWeapons
             AddLocalizations();
             CommandManager.Instance.AddConsoleCommand(new ItemLevelCommand());
             new Harmony(PluginGuid).PatchAll(typeof(Plugin).Assembly);
-            PrefabManager.OnVanillaPrefabsAvailable += AddWeapons;
+            PrefabManager.OnVanillaPrefabsAvailable += AddItems;
             PrefabManager.OnPrefabsRegistered += AudioRouting.Apply;
 
             Log.LogInfo($"{PluginName} v{PluginVersion} loaded.");
         }
 
-        // The weapons copy settings and effects from the game's own, which are only there once the main menu loads
-        private static void AddWeapons()
+        // The weapons copy settings and effects from the game's own, which are only there once the main menu loads, and the
+        // recipes need the game's items
+        private static void AddItems()
         {
-            PrefabManager.OnVanillaPrefabsAvailable -= AddWeapons;
+            PrefabManager.OnVanillaPrefabsAvailable -= AddItems;
             Staves.StaffOfStorms.Staff.Add();
             Staves.WrathOfMuspelheim.Staff.Add();
+            Armor.StormcallerArmor.Add();
         }
 
         private static void AddLocalizations()

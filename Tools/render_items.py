@@ -13,6 +13,8 @@
 # A prefab can end in a view mode:
 # - ":face" for flat items (thrown blades, a boomerang): looks at its widest side, and writes no close-up
 # - ":handle" for items wider than they're long (a parasol): puts up the axis whose length stands apart from the other two
+# - ":flip" for a staff whose head is narrower than its butt: the other end goes on top
+# - ":upright" for build pieces (crafting stations): y up as in the world, seen as the "face" view (no close-up)
 #
 # How it draws: an orthographic camera and a z-buffer, rendered at twice the size and scaled down. Per pixel: the main
 # texture × color, lit by three fixed lights (diffuse, specular from the smoothness, metals tinted by their color, a
@@ -272,6 +274,10 @@ def render(parts, width, height, yaw, pitch, mode=None, crop=None, margin=0.05):
     quarter = extent[up_axis] * 0.25
     if spread[along < -quarter].max(initial=0) > spread[along > quarter].max(initial=0):
         up = -up
+    if mode == "flip":  # a head narrower than its butt (Vikings_Magic's crystal-tipped staves)
+        up = -up
+    if mode == "upright":  # a build piece: as it stands in the world, y up
+        up_axis, up = 1, axes[1]
     side = np.cross(up, axes[int(np.argmin(extent))]) if mode == "face" else axes[(up_axis + 1) % 3]
     rotation = np.stack([side, up, np.cross(side, up)])  # rows: screen x, screen y (up), depth
     cy, sy, cp, sp = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
@@ -402,8 +408,8 @@ def main(src, outdir, prefabs):
     bundle = Bundle(src)
     for entry in prefabs.split(","):
         name, _, mode = entry.partition(":")
-        if mode not in ("", "face", "handle"):
-            raise SystemExit(f"Unknown view mode {mode!r} for {name}: use face or handle")
+        if mode not in ("", "face", "handle", "flip", "upright"):
+            raise SystemExit(f"Unknown view mode {mode!r} for {name}: use face, handle, flip or upright")
         root = bundle.find_root(name)
         if root is None:
             print(f"{name}: no such prefab in {src}")
@@ -416,6 +422,8 @@ def main(src, outdir, prefabs):
         out = os.path.join(outdir, name)
         if mode == "face":
             trim(render(parts, *FACE_SIZE, math.radians(FACE_YAW), math.radians(FACE_PITCH), mode, margin=0.06)).save(out + "_full.png")
+        elif mode == "upright":
+            trim(render(parts, *FACE_SIZE, math.radians(35), math.radians(-20), mode, margin=0.06)).save(out + "_full.png")
         else:
             yaw, pitch = math.radians(YAW), math.radians(PITCH)
             trim(render(parts, *FULL_SIZE, yaw, pitch, mode, margin=0.04)).save(out + "_full.png")

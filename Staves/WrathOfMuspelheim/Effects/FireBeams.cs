@@ -9,7 +9,13 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
     // waves laid over each other, from long swells to small ripples, swinging both ways around the beam's line and pinned
     // at both ends, travelling toward the target; they die down over the beam's life, the ripples first, so it calms
     // and straightens as it fades. Flames flow along each beam, in a sheath of fire, with a glow around them all and a
-    // light where they end. Each game picks its own waves. Used by FireBeam on every game
+    // light where they end. Each game picks its own waves. Used by FireBeam on every game.
+    // With the Firecaller's Regalia the beam is a thread instead (FireChannel; the user, 2026-11-10: "as if there's a
+    // spider thread connecting the tip of the staff and the enemy, constantly undulating and pulsating"): the same waves,
+    // never calming, their swing slowly breathing, its brightness pulsing and flaring at each hit, thinner, and bending out
+    // of the staff's head toward its target. Its tendrils look the same, straight, flaring as they shoot and fading out at
+    // the end (DrawTendril; they were shots, one strand each, until the user found them "barely visible in comparison to
+    // the staff's laser")
     internal class FireBeams
     {
         // Along each beam: enough for its finest ripples on a long shot
@@ -39,6 +45,22 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         // The flames along the cores and sheaths repeat every FlameLength meters and flow toward the target this fast
         private const float FlameLength = 1.5f;
         private const float FlowSpeed = 8f;
+        // The thread: its cores and sheaths this share of a shot's width; each wave's share of the swing, steady, the
+        // ripples less than in a fresh shot; the swing breathing this much either way this many times a second; its
+        // brightness dipping this much this many times a second; at a hit, this much wider at most. It leaves the staff's
+        // head along the staff, bending toward its target: the curve's guide this share of the way, at most MaxBend
+        private const float ThreadWidth = 0.7f;
+        private static readonly float[] ThreadSwing = { 0.8f, 0.65f, 0.5f, 0.4f };
+        private const float Breath = 0.25f;
+        private const float BreathRate = 0.45f;
+        private const float PulseDepth = 0.25f;
+        private const float PulseRate = 1.3f;
+        private const float FlareWidth = 0.6f;
+        private const float BendShare = 0.35f;
+        private const float MaxBend = 8f;
+        // A tendril: fully bright for this share of its life, then fading out; its flare as it shoots dies down this fast
+        private const float TendrilFullBright = 0.6f;
+        private const float TendrilFlareTime = 0.15f;
 
         private static readonly int s_mainTexST = Shader.PropertyToID("_MainTex_ST");
 
@@ -64,8 +86,9 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         private readonly MaterialPropertyBlock m_block = new MaterialPropertyBlock();
         private float m_flickerTimer;
 
-        // From `from` as it moves (the staff's tip), or `fromPoint` if it's gone, to `to`, for `duration` seconds
-        public FireBeams(Transform parent, BeamLook look, float duration, Transform from, Vector3 fromPoint, Vector3 to, BeamSize size)
+        // From `from` as it moves (the staff's tip), or `fromPoint` if it's gone, to `to`, for `duration` seconds; with a
+        // light where it ends, or none (the tendrils: there may be many)
+        public FireBeams(Transform parent, BeamLook look, float duration, Transform from, Vector3 fromPoint, Vector3 to, BeamSize size, bool light = true)
         {
             m_look = look;
             m_duration = duration;
@@ -94,29 +117,88 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
                 }
             }
 
-            GameObject light = new GameObject("light");
-            light.transform.SetParent(parent, false);
-            m_light = light.AddComponent<Light>();
-            m_light.type = LightType.Point;
-            m_light.color = look.m_lightColor;
-            m_light.range = LightRange * size.m_glowSize;
-            m_light.shadows = LightShadows.None;
-            m_lightIntensity = LightIntensity * size.m_glowSize;
+            if (light)
+            {
+                GameObject go = new GameObject("light");
+                go.transform.SetParent(parent, false);
+                m_light = go.AddComponent<Light>();
+                m_light.type = LightType.Point;
+                m_light.color = look.m_lightColor;
+                m_light.range = LightRange * size.m_glowSize;
+                m_light.shadows = LightShadows.None;
+                m_lightIntensity = LightIntensity * size.m_glowSize;
+            }
             Show(false);
         }
 
         // At `age` seconds since it was cast
         public void Draw(float age)
         {
+            DrawShot(age, m_from ? m_from.position : m_fromPoint, m_to);
+        }
+
+        // A shot from `start` to `end`, at `age` seconds since it was cast: wild at first, calming and straightening as it
+        // fades out
+        public void DrawShot(float age, Vector3 start, Vector3 end)
+        {
             if (age < 0f || age >= m_duration)
             {
                 Show(false);
                 return;
             }
-            Show(true);
+            float life = age / m_duration;
+            float fade = Mathf.Clamp01(life < FullBright ? 1f : 1f - (life - FullBright) / (1f - FullBright));
+            // Each wave's swing now, as it calms
+            for (int w = 0; w < m_calm.Length; w++)
+            {
+                m_calm[w] = Mathf.Pow(1f - life, WaveCalming[w]);
+            }
+            // Straight, and thinner as it fades
+            Render(age, start, end, (start + end) * 0.5f, fade, Mathf.Lerp(0.5f, 1f, fade));
+        }
 
-            Vector3 start = m_from ? m_from.position : m_fromPoint;
-            Vector3 delta = m_to - start;
+        // The Firecaller's thread from `start` (the staff's head) to `end`, `age` seconds since it began: leaving along
+        // `bend` (the staff), flaring by `flare` (1 at a hit, dying down)
+        public void DrawThread(float age, Vector3 start, Vector3 bend, Vector3 end, float flare)
+        {
+            float length = Vector3.Distance(start, end);
+            Vector3 guide = bend.sqrMagnitude > 0.001f ? start + bend.normalized * Mathf.Min(length * BendShare, MaxBend) : (start + end) * 0.5f;
+            DrawSteady(age, start, guide, end, flare, 1f);
+        }
+
+        // A tendril of the thread from `start` to `end`, `age` seconds since it shot: straight, and for its duration
+        public void DrawTendril(float age, Vector3 start, Vector3 end)
+        {
+            if (age < 0f || age >= m_duration)
+            {
+                Show(false);
+                return;
+            }
+            float life = age / m_duration;
+            float fade = life < TendrilFullBright ? 1f : 1f - (life - TendrilFullBright) / (1f - TendrilFullBright);
+            DrawSteady(age, start, (start + end) * 0.5f, end, Mathf.Exp(-age / TendrilFlareTime), fade);
+        }
+
+        // The thread's look: its waves steady, their swing breathing; its brightness pulsing, flaring by `flare`, and
+        // fading by `fade` (thinner as it fades)
+        private void DrawSteady(float age, Vector3 start, Vector3 guide, Vector3 end, float flare, float fade)
+        {
+            float breath = 1f + Breath * Mathf.Sin(2f * Mathf.PI * BreathRate * age);
+            for (int w = 0; w < m_calm.Length; w++)
+            {
+                m_calm[w] = ThreadSwing[w] * breath;
+            }
+            float pulse = 1f - PulseDepth * (0.5f + 0.5f * Mathf.Sin(2f * Mathf.PI * PulseRate * age));
+            float width = ThreadWidth * (1f + FlareWidth * flare) * Mathf.Lerp(0.5f, 1f, fade);
+            Render(age, start, end, guide, Mathf.Clamp01(pulse + flare) * fade, width);
+        }
+
+        // The beams from `start` to `end` along a curve guided by `guide` (halfway: straight), each wave swinging its
+        // share of m_calm, as bright as `alpha` and as wide as `width`
+        private void Render(float age, Vector3 start, Vector3 end, Vector3 guide, float alpha, float width)
+        {
+            Show(true);
+            Vector3 delta = end - start;
             float length = delta.magnitude;
             Vector3 dir = length > 0.001f ? delta / length : Vector3.forward;
             Vector3 right = Vector3.Cross(dir, Vector3.up);
@@ -137,17 +219,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
                 }
             }
 
-            float life = age / m_duration;
-            float fade = Mathf.Clamp01(life < FullBright ? 1f : 1f - (life - FullBright) / (1f - FullBright));
-            // Thinner as it fades
-            float thinning = Mathf.Lerp(0.5f, 1f, fade);
             float swing = Mathf.Min(length * Swing, MaxSwing);
             float cyclesScale = Mathf.Clamp(length / CyclesLength, 0.5f, 1.5f);
-            // Each wave's swing now, as it calms
-            for (int w = 0; w < m_calm.Length; w++)
-            {
-                m_calm[w] = swing * Mathf.Pow(1f - life, WaveCalming[w]);
-            }
 
             float brightest = 0f;
             for (int i = 0; i < Points; i++)
@@ -168,24 +241,30 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
                     for (int w = 0; w < WaveCycles.Length; w++)
                     {
                         float angle = 2f * Mathf.PI * (WaveCycles[w] * cyclesScale * t - WaveSpeeds[w] * age);
-                        float amount = m_calm[w] * m_shares[s, w];
+                        float amount = swing * m_calm[w] * m_shares[s, w];
                         x += amount * Mathf.Sin(angle + m_phases[s, w].x);
                         y += amount * Mathf.Sin(angle + m_phases[s, w].y);
                     }
-                    m_positions[i] = start + delta * t + (right * x + up * y) * pinned;
+                    // Along the curve (a quadratic Bezier: straight when guided from halfway)
+                    float u = 1f - t;
+                    Vector3 along = u * u * start + 2f * u * t * guide + t * t * end;
+                    m_positions[i] = along + (right * x + up * y) * pinned;
                     m_middle[i] += m_positions[i] / m_strands.Length;
                 }
-                float alpha = fade * m_flickers[s];
-                Line(m_strands[s], m_strandWidth * thinning, m_look.m_coreColor, alpha);
-                Line(m_sheaths[s], m_sheathWidth * thinning, m_look.m_sheathColor, alpha);
+                float strandAlpha = alpha * m_flickers[s];
+                Line(m_strands[s], m_strandWidth * width, m_look.m_coreColor, strandAlpha);
+                Line(m_sheaths[s], m_sheathWidth * width, m_look.m_sheathColor, strandAlpha);
                 brightest = Mathf.Max(brightest, m_flickers[s]);
             }
 
-            float glowAlpha = fade * brightest;
+            float glowAlpha = alpha * brightest;
             m_glow.SetPositions(m_middle);
             SetColor(m_glow, m_look.m_glowColor, glowAlpha);
-            m_light.transform.position = m_to;
-            m_light.intensity = m_lightIntensity * glowAlpha;
+            if (m_light)
+            {
+                m_light.transform.position = end;
+                m_light.intensity = m_lightIntensity * glowAlpha;
+            }
         }
 
         // A beam's core or sheath along m_positions, with the flames flowing
@@ -200,7 +279,10 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         private void Show(bool show)
         {
             m_glow.enabled = show;
-            m_light.enabled = show;
+            if (m_light)
+            {
+                m_light.enabled = show;
+            }
             for (int s = 0; s < m_strands.Length; s++)
             {
                 m_strands[s].enabled = show;

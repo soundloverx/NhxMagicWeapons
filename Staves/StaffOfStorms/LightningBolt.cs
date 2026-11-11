@@ -52,6 +52,12 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         private static readonly KeyValuePair<int, int> s_casterKey = ZDO.GetHashZDOID("nhx_bolt_caster");
         private static readonly int s_levelKey = "nhx_bolt_level".GetStableHashCode();
         private static readonly int s_jumpsKey = "nhx_bolt_jumps".GetStableHashCode();
+        // How it's drawn: from the caster's staff (the bolt), from where it was created (Lightning Step's), or only its
+        // chain (from an enemy a storm's lightning struck: the strike draws its own)
+        private static readonly int s_modeKey = "nhx_bolt_mode".GetStableHashCode();
+        private const int FromStaff = 0;
+        private const int FromHere = 1;
+        private const int ChainOnly = 2;
 
         private static readonly List<Character> s_nearby = new List<Character>();
         private static readonly Dictionary<Character, int> s_jumpHits = new Dictionary<Character, int>();
@@ -106,6 +112,37 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             }
         }
 
+        // On the caster's game: lightning drawn on every game from `from` to `to`, as the staff's bolt at `level`, hitting
+        // nothing (the Stormcaller's Raiment's Lightning Step)
+        internal static void Arc(GameObject prefab, Character owner, Vector3 from, Vector3 to, int level)
+        {
+            Instantiate(prefab, from, Quaternion.identity).GetComponent<LightningBolt>().Store(owner, to, level, FromHere);
+        }
+
+        // On the caster's game: chain lightning from `struck`, by the staff's rules at `level` (its chance, its jumps,
+        // their damage from `hitData`), as if a bolt had struck it (the Stormcaller's Raiment's storm and Lightning Step)
+        internal static void ChainFrom(GameObject prefab, Character owner, Character struck, HitData hitData, int level)
+        {
+            LightningBolt rules = prefab.GetComponent<LightningBolt>();
+            if (!struck || struck.IsDead() || Random.value > rules.ChainChance(level))
+            {
+                return;
+            }
+            Vector3 center = struck.GetCenterPoint();
+            LightningBolt bolt = Instantiate(prefab, center, Quaternion.identity).GetComponent<LightningBolt>();
+            bolt.Store(owner, center, level, ChainOnly);
+            bolt.Chain(owner, struck, hitData, level, false);
+        }
+
+        private void Store(Character owner, Vector3 end, int level, int mode)
+        {
+            ZDO zdo = m_nview.GetZDO();
+            zdo.Set(s_endKey, end);
+            zdo.Set(s_casterKey, owner.GetZDOID());
+            zdo.Set(s_levelKey, level);
+            zdo.Set(s_modeKey, mode);
+        }
+
         // Shown in the staff's tooltip for its level, after a blank line (ItemData.GetTooltip, if m_projectileToolTip)
         public string GetTooltipString(int itemQuality)
         {
@@ -143,10 +180,11 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             return ("nhx_bolt_jump_point" + jump).GetStableHashCode();
         }
 
-        // On the caster's game: whether the bolt chains from the enemy it struck, and to whom. Stored for every game to draw
-        private void Chain(Character owner, Character struck, HitData hitData, int level)
+        // On the caster's game: whether the bolt chains from the enemy it struck (unless that's been rolled), and to whom.
+        // Stored for every game to draw
+        private void Chain(Character owner, Character struck, HitData hitData, int level, bool roll = true)
         {
-            if (Random.value > ChainChance(level))
+            if (roll && Random.value > ChainChance(level))
             {
                 return;
             }
@@ -256,16 +294,18 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             {
                 return false;
             }
+            int mode = zdo.GetInt(s_modeKey);
             ZDOID casterId = zdo.GetZDOID(s_casterKey);
-            GameObject caster = casterId.IsNone() ? null : ZNetScene.instance.FindInstance(casterId);
+            GameObject caster = casterId.IsNone() || mode != FromStaff ? null : ZNetScene.instance.FindInstance(casterId);
             Transform tip = caster ? StaffHits.FindTip(caster.GetComponent<Character>()) : null;
             LightningSize size = m_look.Size(zdo.GetInt(s_levelKey, 1), 0, m_levelsPerStrand, m_maxStrands);
 
             m_arcs = new LightningArcs(transform, m_look, m_duration);
-            // From the staff as it moves, or from where the attack created the bolt if the caster isn't around here
+            // From the staff as it moves, or from where the attack created the bolt if the caster isn't around here (or
+            // from where it was created, for Lightning Step); a chain alone has its bolt never shown
             LightningAnchor from = new LightningAnchor { m_transform = tip, m_point = transform.position };
             LightningAnchor to = new LightningAnchor { m_point = end };
-            m_arcs.Add(from, to, 0f, size);
+            m_arcs.Add(from, to, mode == ChainOnly ? float.PositiveInfinity : 0f, size);
 
             // Then from each enemy to the next
             LightningSize jumpSize = new LightningSize

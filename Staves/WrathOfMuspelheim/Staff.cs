@@ -8,17 +8,22 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
 {
     // Wrath of Muspelheim: Magic Supremacy's Incinerator (its Firecaller blaster) with attacks of its own. The attack casts
     // a fire beam that hits at once and explodes; the secondary attack (middle mouse, held) is a flamethrower. Built like
-    // the Staff of Storms, its numbers mirror that staff's.
+    // the Staff of Storms, its numbers mirror that staff's. With the whole Firecaller's Regalia on, its beam is channelled
+    // instead (FireChannel), and its flamethrower's flames are blue and reach farther (FlameJet, BlueFlames).
     // This builds and registers the staff, its prefabs and its recipe; all its numbers are here.
     internal static class Staff
     {
-        private const string ItemName = "NhxStaffMuspelheim";
+        internal const string ItemName = "NhxStaffMuspelheim";
+        internal const string NameKey = "$item_nhx_staffmuspelheim";
+        private const string WeaknessName = "SE_NhxFireWeakness";
         private const string BeamName = "NhxMuspelBeam";
         private const string JetName = "NhxMuspelJet";
         private const string FlamesName = "NhxMuspelFlames";
+        private const string BlueFlamesName = "NhxMuspelBlueFlames";
         private const string ShotName = "NhxMuspelShot";
         private const string BlastName = "NhxMuspelBlast";
         private const string LookName = "NhxMuspelLook";
+        private const string ChannelName = "NhxMuspelChannel";
 
         // From Magic Supremacy
         private const string ModelPrefab = "StaffFirecallerBlaster_DO";                 // the Incinerator
@@ -106,9 +111,23 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private const float FlameDamage = 0.15f;
         private const float FlameReach = 7f;
         private const float FlameReachPerLevel = 1f / 3f;
-        private const float FlameWidth = 0.5f;
+        private const float FlameWidth = 0.7f;
         private const float FlameAngle = 12f;
         private const float FlamesMadeReach = 20f;
+        private const float SetFlameReach = 1.2f;
+        // With the Firecaller's Regalia (the user's design, 2026-11-10): the beam channelled while the attack is held,
+        // holding the first enemy it touches (FireChannel). Each second, as the beam's shots and for their eitr, the enemy
+        // takes the beam's hit and explodes, and tendrils shoot from it to every other enemy within 20 m in sight of it,
+        // each taking the full hit too ("Full hit, once each") and exploding, without tendrils of their own. Picked here:
+        // the tendrils shoot 0.15 s after the blast; at most 12 of their explosions show (each is fire, smoke, light and
+        // sound); the thread lets go of an enemy out of sight for half a second (or beyond the beam's range, or dead)
+        private const float TendrilRange = 20f;
+        private const float TendrilDelay = 0.15f;
+        // Each tendril shows this long, with the thread's look and strands (the user found them, as one-strand shots of
+        // 0.6 s, "barely visible in comparison to the staff's laser")
+        private const float TendrilDuration = 0.75f;
+        private const int MaxTendrilBlasts = 12;
+        private const float SightGrace = 0.5f;
         // The staff's model by its level: the Incinerator's look at level 15. Its black swirls come in pairs: around the
         // head at 5, the lower shaft at 10, the butt at 15; they glow half as much as made at 5 and turn half as fast,
         // fully at 15. The head's flame crystal glows 35% at level 1, the butt's crystal 5%, the collar's shards 30%, all
@@ -141,9 +160,14 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             Transform container = StaffEffects.Container;
             BeamLook look = CreateLook(container);
             GameObject shot = StaffEffects.AddWithoutParticles(ShotName, ShotPrefab);
-            GameObject flames = AddFlames();
-            FlameJet jet = CreateJet(container, flames);
+            GameObject flamesSource = Plugin.Assets.LoadAsset<GameObject>(FlamesPrefab);
+            if (!flamesSource)
+            {
+                Plugin.Log.LogWarning($"{FlamesPrefab} isn't in the asset bundle: the Wrath of Muspelheim's flamethrower is invisible.");
+            }
+            FlameJet jet = CreateJet(container, AddFlames(flamesSource, FlamesName, false), AddFlames(flamesSource, BlueFlamesName, true));
             GameObject beam = AddBeam(container, look, shot, CreateBlast(), jet);
+            AddChannel(container, beam.GetComponent<FireBeam>());
 
             GameObject staff = PrefabManager.Instance.CreateClonedPrefab(ItemName, model);
             GameObject tip = new GameObject(StaffHits.TipName);
@@ -153,7 +177,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
 
             ItemDrop.ItemData.SharedData shared = staff.GetComponent<ItemDrop>().m_itemData.m_shared;
             ItemDrop.ItemData.SharedData baseShared = embers.GetComponent<ItemDrop>().m_itemData.m_shared;
-            shared.m_name = "$item_nhx_staffmuspelheim";
+            shared.m_name = NameKey;
             shared.m_description = "$item_nhx_staffmuspelheim_description";
             shared.m_damages = new HitData.DamageTypes { m_pierce = Pierce, m_fire = Fire };
             shared.m_damagesPerLevel = new HitData.DamageTypes { m_pierce = PiercePerLevel, m_fire = FirePerLevel };
@@ -164,6 +188,10 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
                 new LevelDamage.Step(SpiritLevel, new HitData.DamageTypes { m_spirit = Spirit }, new HitData.DamageTypes { m_spirit = SpiritPerLevel }),
                 new LevelDamage.Step(NorthLevel, new HitData.DamageTypes { m_fire = NorthFire }, new HitData.DamageTypes { m_fire = NorthFireBonusPerLevel }));
             shared.m_attackForce = AttackForce;
+            // Its hits leave what they hit a step weaker to fire for a while (ElementWeakness)
+            Sprite icon = shared.m_icons != null && shared.m_icons.Length > 0 ? shared.m_icons[0] : null;
+            shared.m_attackStatusEffect = ElementWeakness.Add(WeaknessName, "$se_nhx_fireweakness", "$se_nhx_fireweakness_tooltip", HitData.DamageType.Fire, false, icon);
+            shared.m_attackStatusEffectChance = 1f;
             // The beam's blast radius and the flamethrower's reach, for the staff's level
             shared.m_projectileToolTip = true;
             // The rest as the Staff of Embers
@@ -225,7 +253,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         // The Incinerator's flamethrower attack shooting `projectile` every `interval` seconds while held, each shot taking
         // `eitr` and dealing the staff's damage times `damage`, aimed straight at the crosshair. Its effects are Magic
         // Supremacy's, which aren't registered here: the shots make their own
-        private static Attack HeldAttack(Attack held, GameObject projectile, float eitr, float interval, float damage)
+        internal static Attack HeldAttack(Attack held, GameObject projectile, float eitr, float interval, float damage)
         {
             Attack attack = held.Clone();
             attack.m_attackProjectile = projectile;
@@ -302,16 +330,19 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             return blast;
         }
 
-        // The Incinerator's flames, made as long as the flamethrower's reach on every game (FlameLook)
-        private static GameObject AddFlames()
+        // The Incinerator's flames, made as long as the flamethrower's reach on every game (FlameLook); or blue, for the
+        // Firecaller's Regalia (BlueFlames)
+        private static GameObject AddFlames(GameObject source, string name, bool blue)
         {
-            GameObject source = Plugin.Assets.LoadAsset<GameObject>(FlamesPrefab);
             if (!source)
             {
-                Plugin.Log.LogWarning($"{FlamesPrefab} isn't in the asset bundle: the Wrath of Muspelheim's flamethrower is invisible.");
                 return null;
             }
-            GameObject flames = PrefabManager.Instance.CreateClonedPrefab(FlamesName, source);
+            GameObject flames = PrefabManager.Instance.CreateClonedPrefab(name, source);
+            if (blue)
+            {
+                BlueFlames.Apply(flames);
+            }
             flames.AddComponent<FlameLook>().m_madeReach = FlamesMadeReach;
             PrefabManager.Instance.AddPrefab(flames);
             AudioRouting.Add(flames);
@@ -319,7 +350,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         }
 
         // Only on the caster's game, for the moment it takes to burn: not registered
-        private static FlameJet CreateJet(Transform container, GameObject flames)
+        private static FlameJet CreateJet(Transform container, GameObject flames, GameObject blueFlames)
         {
             GameObject go = new GameObject(JetName);
             go.transform.SetParent(container, false);
@@ -331,6 +362,9 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             jet.m_width = FlameWidth;
             jet.m_angle = FlameAngle;
             jet.m_flames = flames;
+            jet.m_blueFlames = blueFlames;
+            jet.m_setStatus = Armor.StormcallerArmor.FireSetBonus.GetStableHashCode();
+            jet.m_setReach = SetFlameReach;
             return jet;
         }
 
@@ -356,6 +390,26 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             beam.m_flames = jet;
             PrefabManager.Instance.AddPrefab(go);
             return go;
+        }
+
+        // The channelled beam, for a caster wearing the whole Firecaller's Regalia (its set bonus): networked, so that
+        // every game draws it
+        private static void AddChannel(Transform container, FireBeam beam)
+        {
+            GameObject go = new GameObject(ChannelName);
+            go.transform.SetParent(container, false);
+            go.AddComponent<ZNetView>();
+            FireChannel channel = go.AddComponent<FireChannel>();
+            channel.m_beam = beam;
+            channel.m_tendrilRange = TendrilRange;
+            channel.m_tendrilDelay = TendrilDelay;
+            channel.m_tendrilDuration = TendrilDuration;
+            channel.m_maxTendrilBlasts = MaxTendrilBlasts;
+            channel.m_sightGrace = SightGrace;
+            channel.m_tickTimeout = BeamInterval * 1.6f;
+            PrefabManager.Instance.AddPrefab(go);
+            beam.m_channel = go;
+            beam.m_channelStatus = Armor.StormcallerArmor.FireSetBonus.GetStableHashCode();
         }
     }
 }
