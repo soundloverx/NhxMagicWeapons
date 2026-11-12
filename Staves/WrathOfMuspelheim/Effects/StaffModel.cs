@@ -26,11 +26,22 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         // The embers: the blast effect's floating sparks
         private const string EmbersEffect = "fx_firecallercaller_staff_blaster_hit_DO";
         private const string EmbersPath = "FireExplosionNapalmALT/FloatEmbers";
+        // How the swirls turn (their animation, StaffFire): -120° a second about the staff's axis, a turn every 3 s
+        private const float SwirlTurnSpeed = -120f;
 
-        // On the staff's prefab: the swirls in parts, the embers, and the StaffLevelLook showing them by level. Returns it,
-        // or null if something isn't as expected: the staff then keeps the Incinerator's look at every level
-        internal static StaffLevelLook Build(GameObject staff, Vector3 embersCenter, Vector3 embersSize)
+        // On the staff's prefab: the head's light circling it `lightRadius` m from its spot (HeadLight), the swirls in
+        // parts, the embers, and the StaffLevelLook showing them by level. Returns it, or null if something isn't as
+        // expected: the staff then keeps the Incinerator's look at every level (the light circling as at level 15)
+        internal static StaffLevelLook Build(GameObject staff, Vector3 embersCenter, Vector3 embersSize, float lightRadius)
         {
+            // "equiped" is 30 times bigger than "attach", with no turn: its z is the staff's axis, as the swirls'
+            Transform equipped = staff.transform.Find(EquippedPath);
+            HeadLight light = HeadLight.Replace(staff.transform.Find(LightPath), equipped ? lightRadius / equipped.localScale.x : 0f, SwirlTurnSpeed);
+            if (!light)
+            {
+                Plugin.Log.LogWarning($"The Wrath of Muspelheim's model has no {LightPath}.");
+            }
+
             Transform bodyModel = staff.transform.Find(BodyPath);
             Transform swirlModel = staff.transform.Find(SwirlPath);
             MeshRenderer body = bodyModel ? bodyModel.GetComponent<MeshRenderer>() : null;
@@ -59,9 +70,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             look.m_shardsSlot = ShardsSlot;
             look.m_swirls = swirls.ToArray();
             look.m_spin = swirlModel.GetComponent<Animator>();
-            Transform light = staff.transform.Find(LightPath);
-            look.m_light = light ? light.GetComponent<Light>() : null;
-            look.m_embers = CreateEmbers(staff.transform.Find(EquippedPath), embersCenter, embersSize);
+            look.m_light = light;
+            look.m_embers = CreateEmbers(equipped, embersCenter, embersSize);
             return look;
         }
 

@@ -130,6 +130,7 @@
     <Compile Include="Staves\WrathOfMuspelheim\Effects\ChannelSound.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\FireBeams.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\FlameLook.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\HeadLight.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\StaffLevelLook.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\StaffModel.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\FireBeam.cs" />

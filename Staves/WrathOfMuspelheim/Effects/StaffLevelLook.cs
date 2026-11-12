@@ -16,7 +16,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         public Renderer[] m_swirls = new Renderer[0];
         // Turns the swirls (the Incinerator's animation)
         public Animator m_spin;
-        public Light m_light;
+        // The head's light, circling it with the swirls
+        public HeadLight m_light;
         public ParticleSystem m_embers;
 
         // From which level each swirl shows, in order
@@ -39,17 +40,6 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         public float m_embersRate = 6f;
         public float m_embersStart = 0.5f;
         public float m_maxEmbers = 2f;
-
-        // As made, so that showing it again starts from there
-        private float m_lightIntensity;
-
-        private void Awake()
-        {
-            if (m_light)
-            {
-                m_lightIntensity = m_light.intensity;
-            }
-        }
 
         protected override void Show(int level)
         {
@@ -82,7 +72,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             }
             if (m_light)
             {
-                m_light.intensity = m_lightIntensity * headGlow;
+                m_light.m_brightness = headGlow;
+                m_light.m_spin = spin;
             }
             if (m_embers)
             {

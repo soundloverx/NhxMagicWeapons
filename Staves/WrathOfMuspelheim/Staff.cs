@@ -44,6 +44,9 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private static readonly Vector3 TipPosition = new Vector3(0.011f, -0.012f, 0.95f);
         private static readonly Vector3 EmbersCenter = new Vector3(0.011f, -0.012f, 0.82f);
         private static readonly Vector3 EmbersSize = new Vector3(0.07f, 0.07f, 0.45f);
+        // The head's light circles its spot 6 cm out (the crystal is about 7 cm across), turning with the swirls: still
+        // below level 5, a turn every 6 s at 5, 3 s at 15. The Incinerator's flew up to 3 m around (see HeadLight)
+        private const float HeadLightRadius = 0.06f;
 
         // The beam's damage: the Staff of Storms' in all. Fire burns over time (the game's burning: its hits add up, and
         // water makes it go out five times as fast), so as the Incinerator's (80 pierce, 120 fire) two fifths of it is
@@ -276,7 +279,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         // The swirls in parts that come with the staff's level, and the embers
         private static void SetUpModel(GameObject staff)
         {
-            StaffLevelLook look = StaffModel.Build(staff, EmbersCenter, EmbersSize);
+            StaffLevelLook look = StaffModel.Build(staff, EmbersCenter, EmbersSize, HeadLightRadius);
             if (!look)
             {
                 return;
