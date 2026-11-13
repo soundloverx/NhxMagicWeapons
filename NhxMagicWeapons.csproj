@@ -95,9 +95,14 @@
   <ItemGroup>
     <Compile Include="Armor\ArmorCrackle.cs" />
     <Compile Include="Armor\ArmorGlow.cs" />
+    <Compile Include="Armor\ArmorLegend.cs" />
+    <Compile Include="Armor\ArmorLegendCloak.cs" />
+    <Compile Include="Armor\ArmorLegendRunes.cs" />
+    <Compile Include="Armor\ArmorLegendFx.cs" />
     <Compile Include="Armor\FirecallerColors.cs" />
     <Compile Include="Armor\LevelSetBonus.cs" />
     <Compile Include="Armor\StormcallerArmor.cs" />
+    <Compile Include="ArmorLookCommands.cs" />
     <Compile Include="AudioRouting.cs" />
     <Compile Include="ItemLevelCommand.cs" />
     <Compile Include="Plugin.cs" />
@@ -156,6 +161,12 @@
     <EmbeddedResource Include="Assets\blue_flames">
       <LogicalName>blue_flames</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Assets\legend_cloaks">
+      <LogicalName>legend_cloaks</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\legend_runes">
+      <LogicalName>legend_runes</LogicalName>
+    </EmbeddedResource>
     <!-- What the mod uses of Magic Supremacy's asset bundle (Tools\slim_bundle.py), loaded from the DLL -->
     <EmbeddedResource Include="Assets\nhx_magic_weapons">
       <LogicalName>nhx_magic_weapons</LogicalName>
@@ -177,6 +188,8 @@
     <None Include="Tools\slim_bundle.py" />
     <None Include="Tools\extract_staff_parts.py" />
     <None Include="Tools\render_items.py" />
+    <None Include="Tools\legend_cloaks.py" />
+    <None Include="Tools\legend_runes.py" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

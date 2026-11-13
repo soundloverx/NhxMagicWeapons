@@ -45,6 +45,8 @@ namespace NhxMagicWeapons
 
             AddLocalizations();
             CommandManager.Instance.AddConsoleCommand(new ItemLevelCommand());
+            CommandManager.Instance.AddConsoleCommand(new ArmorLookCommand());
+            CommandManager.Instance.AddConsoleCommand(new ArmorLevelCommand());
             new Harmony(PluginGuid).PatchAll(typeof(Plugin).Assembly);
             PrefabManager.OnVanillaPrefabsAvailable += AddItems;
             PrefabManager.OnPrefabsRegistered += AudioRouting.Apply;

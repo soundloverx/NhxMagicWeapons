@@ -47,7 +47,7 @@ namespace NhxMagicWeapons.Armor
 
         private void UpdateBonus()
         {
-            float bonus = m_perLevel * LowestLevel(m_character as Humanoid);
+            float bonus = m_perLevel * LowestLevel(m_character as Humanoid, m_setName);
             switch (m_element)
             {
                 case HitData.DamageType.Fire:
@@ -81,8 +81,9 @@ namespace NhxMagicWeapons.Armor
             }
         }
 
-        // The lowest level among the set's pieces worn (its four, while the effect is on)
-        private int LowestLevel(Humanoid humanoid)
+        // The lowest level among the set's pieces worn (its four, while the effect is on; ArmorLegend too). On the wearer's
+        // own game: other games don't have its items
+        internal static int LowestLevel(Humanoid humanoid, string setName)
         {
             if (!humanoid)
             {
@@ -91,7 +92,7 @@ namespace NhxMagicWeapons.Armor
             int lowest = int.MaxValue;
             foreach (ItemDrop.ItemData item in new[] { humanoid.m_helmetItem, humanoid.m_chestItem, humanoid.m_legItem, humanoid.m_shoulderItem })
             {
-                if (item != null && item.m_shared.m_setName == m_setName)
+                if (item != null && item.m_shared.m_setName == setName)
                 {
                     lowest = Mathf.Min(lowest, item.m_quality);
                 }

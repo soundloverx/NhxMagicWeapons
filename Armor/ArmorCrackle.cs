@@ -25,6 +25,15 @@ namespace NhxMagicWeapons.Armor
         public float m_duration = 0.12f;
         public float m_minReach = 0.18f;
         public float m_maxReach = 0.45f;
+        // One of the legendary looks being tried (ArmorLegend, its particles): from level 12, the crystal crackles without
+        // the staff too, a single arc every m_legendFrom s at 12 down to m_legendFull s at 20 (± 30%), twice as often in a
+        // thunderstorm. The set's name, for its level
+        public string m_setName = "";
+        public float m_legendFrom = 6f;
+        public float m_legendFull = 2f;
+        private const float LevelInterval = 0.25f;
+        private int m_level;
+        private float m_levelTimer;
 
         // Thin and short: a fraction of the staff's bolt
         private static readonly LightningSize s_size = new LightningSize { m_strands = 1, m_strandSize = 0.15f, m_glowSize = 0.15f, m_branches = 0.5f };
@@ -75,13 +84,29 @@ namespace NhxMagicWeapons.Armor
                 burst.m_arcs.Draw(burst.m_age);
             }
 
-            if (!Ready())
+            m_levelTimer -= dt;
+            if (m_levelTimer <= 0f)
+            {
+                m_levelTimer = LevelInterval;
+                m_level = ArmorLegend.Shows(m_equipment, m_set, m_staff) ? ArmorLegend.Level(m_wearer, m_setName) : 0;
+            }
+            bool wielding = Ready();
+            bool legend = !wielding && ArmorLegend.On(ArmorLegend.Ideas.Particles) && m_level >= ArmorLegend.ParticlesFrom;
+            if (!wielding && !legend)
             {
                 return;
             }
             m_timer -= dt;
             if (m_timer > 0f)
             {
+                return;
+            }
+            if (legend)
+            {
+                bool thunder = EnvMan.instance && EnvMan.instance.IsEnvironment("ThunderStorm");
+                float interval = Mathf.Lerp(m_legendFrom, m_legendFull, Mathf.InverseLerp(ArmorLegend.ParticlesFrom, ArmorLegend.FullLevel, m_level));
+                m_timer = interval * Random.Range(0.7f, 1.3f) * (thunder ? 0.5f : 1f);
+                Crackle(1);
                 return;
             }
             bool storm = StormEye.IsActive(m_wearer);

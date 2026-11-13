@@ -179,16 +179,36 @@ namespace NhxMagicWeapons.Armor
                     continue;
                 }
                 GameObject storm = AddPiece(model, StormPrefix, Pieces[i], StormSet, stormBonus, null, Staves.StaffOfStorms.Staff.ItemName);
-                AddPiece(model, FirePrefix, Pieces[i], FireSet, fireBonus, colors, Staves.WrathOfMuspelheim.Staff.ItemName);
+                GameObject fire = AddPiece(model, FirePrefix, Pieces[i], FireSet, fireBonus, colors, Staves.WrathOfMuspelheim.Staff.ItemName);
+                if (Pieces[i] != "Cloak")
+                {
+                    // The legendary looks' runes (ArmorLegend), on the Firecaller's Regalia only (the user, 2026-11-13: "Can we
+                    // keep runes for the Firecaller set only?")
+                    AddLegendRunes(fire, FirePrefix, FireSet, Staves.WrathOfMuspelheim.Staff.ItemName, false);
+                }
+                if (Pieces[i] == "Cloak")
+                {
+                    // The legendary looks' patterned cloak (ArmorLegend), for each set
+                    AddLegendCloak(storm, StormPrefix, StormSet, Staves.StaffOfStorms.Staff.ItemName, true);
+                    AddLegendCloak(fire, FirePrefix, FireSet, Staves.WrathOfMuspelheim.Staff.ItemName, false);
+                }
+                if (Pieces[i] != "Robe")
+                {
+                    continue;
+                }
                 // The robe's crystal crackles, with the whole set on and the staff in hand
                 Transform skin = storm.transform.Find("attach_skin");
-                if (Pieces[i] == "Robe" && skin)
+                if (skin)
                 {
                     ArmorCrackle crackle = skin.gameObject.AddComponent<ArmorCrackle>();
                     crackle.m_set = System.Array.ConvertAll(Pieces, p => (StormPrefix + p).GetStableHashCode());
                     crackle.m_staff = Staves.StaffOfStorms.Staff.ItemName.GetStableHashCode();
                     crackle.m_look = Staves.StaffOfStorms.Staff.Look;
+                    crackle.m_setName = StormSet;
                 }
+                // The legendary looks at high levels: particles and signatures (ArmorLegend), for each set
+                AddLegendFx(storm, StormPrefix, StormSet, Staves.StaffOfStorms.Staff.ItemName, true);
+                AddLegendFx(fire, FirePrefix, FireSet, Staves.WrathOfMuspelheim.Staff.ItemName, false);
             }
         }
 
@@ -233,6 +253,49 @@ namespace NhxMagicWeapons.Armor
                 HitData.DamageType.Fire, true, bonus.m_icon);
             ItemManager.Instance.AddStatusEffect(new CustomStatusEffect(bonus, false));
             return bonus;
+        }
+
+        private static void AddLegendFx(GameObject robe, string prefix, string set, string staff, bool storm)
+        {
+            Transform skin = robe.transform.Find("attach_skin");
+            if (!skin)
+            {
+                return;
+            }
+            ArmorLegendFx fx = skin.gameObject.AddComponent<ArmorLegendFx>();
+            fx.m_set = System.Array.ConvertAll(Pieces, p => (prefix + p).GetStableHashCode());
+            fx.m_staff = staff.GetStableHashCode();
+            fx.m_setName = set;
+            fx.m_storm = storm;
+            fx.m_look = Staves.StaffOfStorms.Staff.Look;
+        }
+
+        private static void AddLegendRunes(GameObject piece, string prefix, string set, string staff, bool storm)
+        {
+            Transform skin = piece.transform.Find("attach_skin");
+            if (!skin)
+            {
+                return;
+            }
+            ArmorLegendRunes runes = skin.gameObject.AddComponent<ArmorLegendRunes>();
+            runes.m_set = System.Array.ConvertAll(Pieces, p => (prefix + p).GetStableHashCode());
+            runes.m_staff = staff.GetStableHashCode();
+            runes.m_setName = set;
+            runes.m_storm = storm;
+        }
+
+        private static void AddLegendCloak(GameObject cloak, string prefix, string set, string staff, bool storm)
+        {
+            Transform skin = cloak.transform.Find("attach_skin");
+            if (!skin)
+            {
+                return;
+            }
+            ArmorLegendCloak look = skin.gameObject.AddComponent<ArmorLegendCloak>();
+            look.m_set = System.Array.ConvertAll(Pieces, p => (prefix + p).GetStableHashCode());
+            look.m_staff = staff.GetStableHashCode();
+            look.m_setName = set;
+            look.m_storm = storm;
         }
 
         private static GameObject AddPiece(GameObject model, string prefix, string piece, string set, StatusEffect bonus, FirecallerColors colors, string staff)

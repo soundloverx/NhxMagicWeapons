@@ -65,10 +65,10 @@ namespace NhxMagicWeapons.Armor
             m_equipment = GetComponentInParent<VisEquipment>();
         }
 
-        // The whole set worn and its staff in hand, as this VisEquipment shows them (ArmorCrackle too)
-        internal static bool Wielding(VisEquipment equipment, int[] set, int staff)
+        // The whole set worn, as this VisEquipment shows it (ArmorLegend too)
+        internal static bool WholeSet(VisEquipment equipment, int[] set)
         {
-            if (!equipment || staff == 0 || equipment.m_currentRightItemHash != staff)
+            if (!equipment)
             {
                 return false;
             }
@@ -81,6 +81,12 @@ namespace NhxMagicWeapons.Armor
                 }
             }
             return true;
+        }
+
+        // The whole set worn and its staff in hand, as this VisEquipment shows them (ArmorCrackle too)
+        internal static bool Wielding(VisEquipment equipment, int[] set, int staff)
+        {
+            return equipment && staff != 0 && equipment.m_currentRightItemHash == staff && WholeSet(equipment, set);
         }
 
         // A material slot's color that glows (black emission, as on most of the set, doesn't)
