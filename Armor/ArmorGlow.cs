@@ -40,7 +40,6 @@ namespace NhxMagicWeapons.Armor
 
         private void Awake()
         {
-            m_equipment = GetComponentInParent<VisEquipment>();
             foreach (Renderer renderer in GetComponentsInChildren<Renderer>(true))
             {
                 Material[] materials = renderer.sharedMaterials;
@@ -54,6 +53,16 @@ namespace NhxMagicWeapons.Armor
             {
                 enabled = false;
             }
+        }
+
+        // The wearer, found here and not in Awake: chest, legs and cape come through VisEquipment.AttachArmor, which
+        // instantiates attach_skin under the body already, but the helmet comes through AttachItem, which instantiates
+        // it without a parent and activates it (running Awake) before moving it under the body, so in Awake the hood had
+        // no VisEquipment above it and stayed dim (the user, 2026-11-13: the hood's crystal on its back "doesn't
+        // intensify"). Start runs before the first Update, after AttachItem has parented it
+        private void Start()
+        {
+            m_equipment = GetComponentInParent<VisEquipment>();
         }
 
         // The whole set worn and its staff in hand, as this VisEquipment shows them (ArmorCrackle too)
