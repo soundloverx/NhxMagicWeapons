@@ -3,19 +3,29 @@ using UnityEngine.Rendering;
 
 namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
 {
-    // Draws the staff's fire beam under an object: from the staff's head to where it hits, one beam, or several side by
-    // side at higher levels, each a smooth, fluid waveform (the user, 2026-10-25: "a rounded, more 'fluid' lightning, more
-    // similar to a waveform which looks very chaotic when shot and then straightens out" until it's gone). Each is a few
-    // waves laid over each other, from long swells to small ripples, swinging both ways around the beam's line and pinned
-    // at both ends, travelling toward the target; they die down over the beam's life, the ripples first, so it calms
-    // and straightens as it fades. Flames flow along each beam, in a sheath of fire, with a glow around them all and a
-    // light where they end. Each game picks its own waves. Used by FireBeam on every game.
+    // Draws the staff's fire beam under an object: from the staff's head to where it hits, one beam, or several at higher
+    // levels, each a smooth, fluid waveform (the user, 2026-10-25: "a rounded, more 'fluid' lightning, more similar to a
+    // waveform which looks very chaotic when shot and then straightens out" until it's gone). Each is a few waves laid
+    // over each other, from long swells to small ripples, swinging both ways around the beam's line and pinned at both
+    // ends, travelling toward the target; they die down over the beam's life, the ripples first, so it calms and
+    // straightens as it fades. Flames flow along each beam, in a sheath of fire, with a glow and a light where they end.
+    // Each game picks its own waves. Used by FireBeam on every game.
+    // The beam is a main beam and its weavers (the user, 2026-11-13, showing an old game's beam: "I would like it to be a
+    // bit tighter along the path to the target. The beams look a bit like lightning, but they are not jagged, they are
+    // more sinusoidal"; then, of drawings of it: "I love the core and weavers version. Can we replace the current beams
+    // with that and also have it evolve with the staff's level like we currently do?"). The first strand is the main
+    // beam: thicker and whiter, hugging the line, the glow along it. The strands that come with the staff's level
+    // (BeamLook.Size; "only keeping one main one and the others be thinner around it, increasing in intensity with level,
+    // resetting at certain levels - just like it does now") are its weavers: thin, deeper orange, swinging wider around
+    // it, each second one opposite the one before, so that they keep crossing over it. Until then it was as many equal
+    // beams side by side, swinging about twice as far.
     // With the Firecaller's Regalia the beam is a thread instead (FireChannel; the user, 2026-11-10: "as if there's a
-    // spider thread connecting the tip of the staff and the enemy, constantly undulating and pulsating"): the same waves,
-    // never calming, their swing slowly breathing, its brightness pulsing and flaring at each hit, thinner, and bending out
-    // of the staff's head toward its target. Its tendrils look the same, straight, flaring as they shoot and fading out at
-    // the end (DrawTendril; they were shots, one strand each, until the user found them "barely visible in comparison to
-    // the staff's laser")
+    // spider thread connecting the tip of the staff and the enemy, constantly undulating and pulsating"): the same main
+    // beam and weavers ("the regalia's tendrils can look the same, it's better to reuse it instead of having new
+    // formulas"), their waves never calming, their swing slowly breathing, its brightness pulsing and flaring at each
+    // hit, thinner, and bending out of the staff's head toward its target. Its tendrils look the same, straight, flaring
+    // as they shoot and fading out at the end (DrawTendril; they were shots, one strand each, until the user found them
+    // "barely visible in comparison to the staff's laser")
     internal class FireBeams
     {
         // Along each beam: enough for its finest ripples on a long shot
@@ -29,16 +39,41 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         // Fully bright for this share of its life, then fading and thinning out
         private const float FullBright = 0.3f;
         private const float FlickerInterval = 0.05f;
-        // How far the waves swing at first: this share of the beam's length, at most MaxSwing meters (5% and 1.2 m until
-        // the user asked for "just a little" less, with fewer curves)
-        private const float Swing = 0.04f;
-        private const float MaxSwing = 1f;
+        // How far the waves swing at first: this share of the beam's length, at most MaxSwing meters (5% and 1.2 m, then
+        // 4% and 1 m when the user asked for "just a little" less, with fewer curves; about half of that since
+        // 2026-11-13, to stay "tighter along the path to the target"). Of that, the main beam swings MainSwing and the
+        // weavers WeaverSwing, each wave by its share (below): the middle waves lead, as the long swell carries a whole
+        // beam off the line and the ripples blur its curves (the drawings' numbers, which the user picked; equal beams
+        // had 1, 0.55, 0.3 and 0.15)
+        private const float Swing = 0.022f;
+        private const float MaxSwing = 0.55f;
+        private const float MainSwing = 0.4f;
+        private const float WeaverSwing = 1.2f;
+        private static readonly float[] MainShares = { 0.5f, 1f, 0.5f, 0.1f };
+        private static readonly float[] WeaverShares = { 0.25f, 1f, 0.6f, 0.12f };
+        // The weavers stand evenly around the main beam (two: on opposite sides), each drawn in its own frame, turned to
+        // its place. On these waves they all have the first weaver's shape, so two of them swing opposite each other
+        private static readonly int[] SharedWaves = { 1, 2 };
+        // Being tried (the user, 2026-11-13: "it feels like all the beams are on the same plane [...] I want to see what
+        // it would look like if the origins of the thin beams were to rotate around the origin of the main beam slowly, so
+        // it makes for an overall more 3D look"): the weavers leave the main beam's origin and fan out to this far from
+        // it, each at its place around it, over the beam's first s_orbitFan meters, then close in to meet it at the
+        // target; and they turn around it this many times a second, their whole shapes with them (as the staff's swirls:
+        // a turn every 3 s; negative: the other way). Each beam starts at a turn of its own. At first they started that
+        // far out, on a circle around the origin; the user, having tried it: "indeed the weavers spawn in the air. I
+        // guess they could spawn from the same source as the main beam, as long as they fan out a bit and rotate around
+        // it just like they do now. The overall visual is almost perfect". Radius and speed 0: as before, the weavers in
+        // a fixed frame. Set with nhx_beamorbit (BeamOrbitCommand) until the user picks
+        internal static float s_orbitRadius = 0.2f;
+        internal static float s_orbitSpeed = 1f / 3f;
+        internal static float s_orbitFan = 1f;
+        // On a short beam the fan takes this share of its length at most
+        private const float MaxFanShare = 0.3f;
         // The waves laid over each other: how many times each rises and falls along a 15 m beam (more on a longer one,
-        // fewer on a shorter one, within a half and one and a half times as many; a fifth more of each before), their
-        // share of the swing, how many times a second each travels its length toward the target, and how fast it dies
-        // down: its swing goes as (life left) to this power, so the ripples are gone first and the swells last
+        // fewer on a shorter one, within a half and one and a half times as many; a fifth more of each before), how many
+        // times a second each travels its length toward the target, and how fast it dies down: its swing goes as (life
+        // left) to this power, so the ripples are gone first and the swells last
         private static readonly float[] WaveCycles = { 1f, 2.3f, 4.9f, 10f };
-        private static readonly float[] WaveShares = { 1f, 0.55f, 0.3f, 0.15f };
         private static readonly float[] WaveSpeeds = { 0.6f, 1.2f, 2.2f, 3.5f };
         private static readonly float[] WaveCalming = { 1.2f, 2f, 2.8f, 3.6f };
         private const float CyclesLength = 15f;
@@ -72,8 +107,11 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         private readonly LineRenderer[] m_strands;
         private readonly LineRenderer[] m_sheaths;
         private readonly float[] m_flickers;
-        private readonly float m_strandWidth;
-        private readonly float m_sheathWidth;
+        // Each strand's core and sheath (the main beam's, then the weavers'): their widths and colors
+        private readonly float[] m_strandWidths;
+        private readonly float[] m_sheathWidths;
+        private readonly Color[] m_coreColors;
+        private readonly Color[] m_sheathColors;
         // Each beam's waves: their phases (on each side of the line) and their share of the swing
         private readonly Vector2[,] m_phases;
         private readonly float[,] m_shares;
@@ -81,13 +119,16 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         private readonly Light m_light;
         private readonly float m_lightIntensity;
         private readonly Vector3[] m_positions = new Vector3[Points];
-        private readonly Vector3[] m_middle = new Vector3[Points];
+        private readonly Vector3[] m_mainPositions = new Vector3[Points];
         private readonly float[] m_calm = new float[WaveCycles.Length];
         private readonly MaterialPropertyBlock m_block = new MaterialPropertyBlock();
         private float m_flickerTimer;
+        // Where the weavers' turn around the main beam starts (radians)
+        private readonly float m_orbitStart;
 
         // From `from` as it moves (the staff's tip), or `fromPoint` if it's gone, to `to`, for `duration` seconds; with a
-        // light where it ends, or none (the tendrils: there may be many)
+        // light where it ends, or none (the tendrils: there may be many). The first of `size`'s strands is the main beam,
+        // the others its weavers
         public FireBeams(Transform parent, BeamLook look, float duration, Transform from, Vector3 fromPoint, Vector3 to, BeamSize size, bool light = true)
         {
             m_look = look;
@@ -96,26 +137,46 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             m_fromPoint = fromPoint;
             m_to = to;
             // Drawn in this order, the glow first: they're all at the same place, so their distance doesn't sort them
-            m_glow = CreateLine(parent, "glow", GlowWidth * size.m_glowSize, look.m_glowMaterial, 0);
-            m_sheathWidth = SheathWidth * size.m_glowSize;
-            m_strandWidth = CoreWidth * size.m_strandSize;
+            m_glow = CreateLine(parent, "glow", GlowWidth * size.m_glowSize * look.m_mainGlow, look.m_glowMaterial, 0);
             m_strands = new LineRenderer[size.m_strands];
             m_sheaths = new LineRenderer[size.m_strands];
             m_flickers = new float[size.m_strands];
+            m_strandWidths = new float[size.m_strands];
+            m_sheathWidths = new float[size.m_strands];
+            m_coreColors = new Color[size.m_strands];
+            m_sheathColors = new Color[size.m_strands];
             m_phases = new Vector2[size.m_strands, WaveCycles.Length];
             m_shares = new float[size.m_strands, WaveCycles.Length];
             for (int s = 0; s < size.m_strands; s++)
             {
-                m_sheaths[s] = CreateLine(parent, "sheath", m_sheathWidth, look.m_sheathMaterial, 1);
+                bool weaver = s > 0;
+                m_strandWidths[s] = CoreWidth * size.m_strandSize * (weaver ? look.m_weaverSize : look.m_mainSize);
+                m_sheathWidths[s] = SheathWidth * size.m_glowSize * (weaver ? look.m_weaverSheathSize : 1f);
+                m_coreColors[s] = weaver ? look.m_weaverColor : look.m_mainColor;
+                m_sheathColors[s] = weaver ? look.m_weaverSheathColor : look.m_sheathColor;
+                m_sheaths[s] = CreateLine(parent, "sheath", m_sheathWidths[s], look.m_sheathMaterial, 1);
                 m_sheaths[s].textureMode = LineTextureMode.Tile;
-                m_strands[s] = CreateLine(parent, "beam", m_strandWidth, look.m_coreMaterial, 2);
+                // The weavers cross over the main beam
+                m_strands[s] = CreateLine(parent, "beam", m_strandWidths[s], look.m_coreMaterial, weaver ? 3 : 2);
                 m_strands[s].textureMode = LineTextureMode.Tile;
                 for (int w = 0; w < WaveCycles.Length; w++)
                 {
                     m_phases[s, w] = new Vector2(Random.Range(0f, 2f * Mathf.PI), Random.Range(0f, 2f * Mathf.PI));
-                    m_shares[s, w] = WaveShares[w] * Random.Range(0.7f, 1.3f);
+                    float share = weaver ? WeaverShares[w] * WeaverSwing : MainShares[w] * MainSwing;
+                    m_shares[s, w] = share * Random.Range(0.7f, 1.3f);
+                }
+                // The first weaver's shape on the main waves, turned to this one's place around the main beam (Render):
+                // where one of two loops out on one side, the other does on the other side, and they cross over the
+                // main beam between
+                if (s > 1)
+                {
+                    foreach (int w in SharedWaves)
+                    {
+                        m_phases[s, w] = m_phases[1, w];
+                    }
                 }
             }
+            m_orbitStart = Random.Range(0f, 2f * Mathf.PI);
 
             if (light)
             {
@@ -179,6 +240,12 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             DrawSteady(age, start, (start + end) * 0.5f, end, Mathf.Exp(-age / TendrilFlareTime), fade);
         }
 
+        // Nothing drawn until it's drawn again (the thread, when its channel's attack is over)
+        public void Hide()
+        {
+            Show(false);
+        }
+
         // The thread's look: its waves steady, their swing breathing; its brightness pulsing, flaring by `flare`, and
         // fading by `fade` (thinner as it fades)
         private void DrawSteady(float age, Vector3 start, Vector3 guide, Vector3 end, float flare, float fade)
@@ -223,14 +290,30 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             float cyclesScale = Mathf.Clamp(length / CyclesLength, 0.5f, 1.5f);
 
             float brightest = 0f;
-            for (int i = 0; i < Points; i++)
-            {
-                m_middle[i] = Vector3.zero;
-            }
             // The flames flow along the cores: the texture repeats every FlameLength meters, moving toward the target
             m_block.SetVector(s_mainTexST, new Vector4(1f / FlameLength, 1f, -age * FlowSpeed / FlameLength, 0f));
+            bool orbiting = s_orbitRadius != 0f || s_orbitSpeed != 0f;
+            float fanLength = Mathf.Max(0.01f, Mathf.Min(s_orbitFan, length * MaxFanShare));
             for (int s = 0; s < m_strands.Length; s++)
             {
+                // A weaver's own frame: out from the main beam at its place around it (they stand evenly around, half
+                // a turn apart without the orbit, as they were), and across. The main beam's is the beam's
+                Vector3 outward = right;
+                Vector3 across = up;
+                float fanOut = 0f;
+                if (s > 0)
+                {
+                    float turn = 2f * Mathf.PI * (s - 1) / (m_strands.Length - 1);
+                    if (orbiting)
+                    {
+                        turn += m_orbitStart + 2f * Mathf.PI * s_orbitSpeed * age;
+                        fanOut = s_orbitRadius;
+                    }
+                    float cos = Mathf.Cos(turn);
+                    float sin = Mathf.Sin(turn);
+                    outward = right * cos + up * sin;
+                    across = up * cos - right * sin;
+                }
                 for (int i = 0; i < Points; i++)
                 {
                     float t = (float)i / (Points - 1);
@@ -248,17 +331,24 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
                     // Along the curve (a quadratic Bezier: straight when guided from halfway)
                     float u = 1f - t;
                     Vector3 along = u * u * start + 2f * u * t * guide + t * t * end;
-                    m_positions[i] = along + (right * x + up * y) * pinned;
-                    m_middle[i] += m_positions[i] / m_strands.Length;
+                    // A weaver leaves the main beam's own origin, fans out from it over the first meters, and closes in to
+                    // meet it at the end
+                    float fan = fanOut != 0f ? fanOut * Mathf.SmoothStep(0f, 1f, t * length / fanLength) * u : 0f;
+                    m_positions[i] = along + outward * (x * pinned + fan) + across * (y * pinned);
+                    // The glow goes along the main beam
+                    if (s == 0)
+                    {
+                        m_mainPositions[i] = m_positions[i];
+                    }
                 }
                 float strandAlpha = alpha * m_flickers[s];
-                Line(m_strands[s], m_strandWidth * width, m_look.m_coreColor, strandAlpha);
-                Line(m_sheaths[s], m_sheathWidth * width, m_look.m_sheathColor, strandAlpha);
+                Line(m_strands[s], m_strandWidths[s] * width, m_coreColors[s], strandAlpha);
+                Line(m_sheaths[s], m_sheathWidths[s] * width, m_sheathColors[s], strandAlpha);
                 brightest = Mathf.Max(brightest, m_flickers[s]);
             }
 
             float glowAlpha = alpha * brightest;
-            m_glow.SetPositions(m_middle);
+            m_glow.SetPositions(m_mainPositions);
             SetColor(m_glow, m_look.m_glowColor, glowAlpha);
             if (m_light)
             {

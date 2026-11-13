@@ -104,6 +104,7 @@
     <Compile Include="Armor\StormcallerArmor.cs" />
     <Compile Include="ArmorLookCommands.cs" />
     <Compile Include="AudioRouting.cs" />
+    <Compile Include="BeamOrbitCommand.cs" />
     <Compile Include="ItemLevelCommand.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -131,15 +132,20 @@
     <Compile Include="Staves\StaffOfStorms\StormEye.cs" />
     <Compile Include="Staves\StaffOfStorms\StormEyeTick.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\BeamLook.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\CometDash.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\BlueFlames.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\ChannelSigil.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\ChannelSound.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\ChannelWings.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\FireBeams.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\Effects\FireParticles.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\FlameLook.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\HeadLight.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\StaffLevelLook.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Effects\StaffModel.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\FireBeam.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\FireChannel.cs" />
+    <Compile Include="Staves\WrathOfMuspelheim\FireComet.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\FlameJet.cs" />
     <Compile Include="Staves\WrathOfMuspelheim\Staff.cs" />
   </ItemGroup>
@@ -188,6 +194,10 @@
     <None Include="Tools\slim_bundle.py" />
     <None Include="Tools\extract_staff_parts.py" />
     <None Include="Tools\render_items.py" />
+    <None Include="Tools\render_armor.py" />
+    <None Include="Tools\recolor_armor.py" />
+    <None Include="Tools\recolor_flames.py" />
+    <None Include="Tools\make_channel_sound.py" />
     <None Include="Tools\legend_cloaks.py" />
     <None Include="Tools\legend_runes.py" />
   </ItemGroup>

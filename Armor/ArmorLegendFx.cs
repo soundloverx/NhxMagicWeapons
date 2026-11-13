@@ -195,6 +195,19 @@ namespace NhxMagicWeapons.Armor
                 }
             }
             UpdateArcs(Time.deltaTime);
+            // The Firecaller's showpieces held up for a look, without a channel (nhx_armorlook show), on this game only,
+            // at the levels the channel shows them
+            if (!m_storm && ArmorLegend.s_showpieces && m_wearer && m_wearer == Player.m_localPlayer)
+            {
+                if (ArmorLegend.On(ArmorLegend.Ideas.Sigil) && m_level >= ArmorLegend.SigilFrom)
+                {
+                    Staves.WrathOfMuspelheim.Effects.ChannelSigil.Hold(m_wearer, 3, 0f);
+                }
+                if (ArmorLegend.On(ArmorLegend.Ideas.Wings) && m_level >= ArmorLegend.WingsFrom)
+                {
+                    Staves.WrathOfMuspelheim.Effects.ChannelWings.Hold(m_wearer, true, 0f);
+                }
+            }
         }
 
         // After the animation has posed the bones
@@ -362,43 +375,7 @@ namespace NhxMagicWeapons.Armor
         // A copy of a Magic Supremacy effect's particle system (without its children) under the root, at scale 1
         private ParticleSystem Copy(string effect, string path)
         {
-            GameObject prefab = Plugin.Assets.LoadAsset<GameObject>(effect);
-            Transform source = prefab ? prefab.transform.Find(path) : null;
-            if (!source || !source.GetComponent<ParticleSystem>())
-            {
-                Plugin.Log.LogWarning($"No {path} in {effect}: a legendary armor look is missing.");
-                return null;
-            }
-            GameObject copy = Instantiate(source.gameObject, m_root, false);
-            for (int i = copy.transform.childCount - 1; i >= 0; i--)
-            {
-                DestroyImmediate(copy.transform.GetChild(i).gameObject);
-            }
-            copy.layer = m_root.gameObject.layer;
-            copy.transform.localPosition = Vector3.zero;
-            copy.transform.localRotation = Quaternion.identity;
-            copy.transform.localScale = Vector3.one;
-            ParticleSystem particles = copy.GetComponent<ParticleSystem>();
-            particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            ParticleSystem.MainModule main = particles.main;
-            main.loop = true;
-            main.duration = 1f;
-            main.playOnAwake = false;
-            main.prewarm = false;
-            main.startDelay = 0f;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
-            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
-            main.startSize3D = false;
-            ParticleSystem.EmissionModule emission = particles.emission;
-            emission.enabled = true;
-            emission.SetBursts(new ParticleSystem.Burst[0]);
-            ParticleSystem.CollisionModule collision = particles.collision;
-            collision.enabled = false;
-            ParticleSystem.SubEmittersModule sub = particles.subEmitters;
-            sub.enabled = false;
-            ParticleSystem.LightsModule lights = particles.lights;
-            lights.enabled = false;
-            return particles;
+            return StaffEffects.CopyParticles(effect, path, m_root, "a legendary armor look is missing");
         }
 
         // Embers drifting up out of a box (the Wrath of Muspelheim's, from the blast's floating sparks)

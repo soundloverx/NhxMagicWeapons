@@ -5,8 +5,8 @@ using UnityEngine;
 namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
 {
     // The staff's fire beam. Like the Staff of Storms' bolt, it hits the first thing in line at once, up to its range, and
-    // every game draws it from the caster's staff to that point for a moment: one beam, or several braided together at
-    // higher levels of the staff. Where it hits, it explodes: everything else around takes part of its damage, in a radius
+    // every game draws it from the caster's staff to that point for a moment: a main beam, with thin strands weaving
+    // around it at higher levels of the staff. Where it hits, it explodes: everything else around takes part of its damage, in a radius
     // growing with the staff's level, and every game shows the blast at that size.
     // The attack creates it on the caster's game (Attack.FireProjectileBurst), and calls Setup there: that game finds what
     // it hits, deals the damage, creates the shot's sound and stores the beam's end, its caster, the staff's level and
@@ -206,12 +206,18 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         // all) of its share
         internal void ShowBlast(Vector3 point, int level, float shake)
         {
+            ShowBlastOfRadius(point, BlastRadius(level), shake);
+        }
+
+        // The same, `radius` around (the Firecaller's Regalia's comet, FireComet)
+        internal void ShowBlastOfRadius(Vector3 point, float radius, float shake)
+        {
             if (!m_blast)
             {
                 return;
             }
             GameObject blast = Instantiate(m_blast, point, Quaternion.identity);
-            float scale = BlastRadius(level) / m_blastEffectRadius;
+            float scale = radius / m_blastEffectRadius;
             StaffEffects.Scale(blast, scale);
             // As made, every shot would shake the camera hard 50 m around
             CamShaker shaker = blast.GetComponentInChildren<CamShaker>();

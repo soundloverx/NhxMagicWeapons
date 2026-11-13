@@ -24,6 +24,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private const string BlastName = "NhxMuspelBlast";
         private const string LookName = "NhxMuspelLook";
         private const string ChannelName = "NhxMuspelChannel";
+        private const string CometName = "NhxMuspelComet";
 
         // From Magic Supremacy
         private const string ModelPrefab = "StaffFirecallerBlaster_DO";                 // the Incinerator
@@ -76,18 +77,24 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         // handle the staff like a shotgun instead of swinging it"; it was the Staff of Embers' cast): a beam as the click
         // comes through, and one a second while held
         private const float BeamInterval = 1f;
+        // Elemental Magic raised by each shot that hits a character (once a shot, however many it hits): as the Staff of
+        // Storms' bolt (the Staff of Embers' 1). As a copy of the Incinerator's flamethrower attack, whose puffs raise it
+        // by 0.2 each, the beam raised it 5 times slower until 2026-11-13 (found reading the code; the user: "Apply fixes")
+        private const float BeamSkillRaise = 1f;
         // How long each beam shows: wild as it's shot, calming and straightening as it fades (FireBeams). It was 0.35 s
         // before it became a waveform
         private const float BeamDuration = 0.6f;
         private const float AttackForce = 40f;
         // The Staff of Embers' durability (its base and per level) times this
         private const float DurabilityBoost = 2f;
-        // The beam's look by the staff's level, up to level 20 (higher levels look the same): waveforms side by side (see
-        // FireBeams), one more at levels 5 and 10 (1 at levels 1-4, 2 at 5-9, 3 from 10; the user asked for 2 fewer at 20
-        // than the Staff of Storms' 5), each thicker at each level from 50% of a full beam's width (35% until the user
-        // found it too dim) up by 7.5% a level, and thinner again when one more comes; at most 80% (as at levels 9 and
-        // 14, so from 14 on). The sheath and glow around them and the light where they hit: 37% at level 1, 4.5% more a
-        // level, 100% at 15, 123% at 20
+        // The beam's look by the staff's level, up to level 20 (higher levels look the same): a main beam and thin strands
+        // weaving around it (see FireBeams; equal waveforms side by side until 2026-11-13), one more strand at levels 5
+        // and 10: the main beam alone at levels 1-4, with one weaver at 5-9, with two from 10 (3 strands; the user asked
+        // for 2 fewer at 20 than the Staff of Storms' 5). All thicker at each level, from 50% of a strand's full width
+        // (35% until the user found it too dim) up by 7.5% a level, and thinner again when one more comes; at most 80%
+        // (as at levels 9 and 14, so from 14 on); the main beam is 1.5 times that wide, the weavers half (BeamLook). The
+        // sheath and glow around them and the light where they hit: 37% at level 1, 4.5% more a level, 100% at 15, 123%
+        // at 20
         private const int MaxLookLevel = 20;
         private const float StrandSize = 0.5f;
         private const float StrandSizePerLevel = 0.075f;
@@ -112,11 +119,15 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private const float FlameEitr = 4f;
         private const float FlameInterval = 0.2f;
         private const float FlameDamage = 0.15f;
+        // Elemental Magic raised by each puff that burns a character: the Incinerator's, 1 a second while burning
+        private const float FlameSkillRaise = 0.2f;
         private const float FlameReach = 7f;
         private const float FlameReachPerLevel = 1f / 3f;
         private const float FlameWidth = 0.7f;
         private const float FlameAngle = 12f;
         private const float FlamesMadeReach = 20f;
+        // With the Firecaller's Regalia the flames reach this much farther: 20%, the user's own number (8.4 m at level 5,
+        // 14.4 m at 20)
         private const float SetFlameReach = 1.2f;
         // With the Firecaller's Regalia (the user's design, 2026-11-10): the beam channelled while the attack is held,
         // holding the first enemy it touches (FireChannel). Each second, as the beam's shots and for their eitr, the enemy
@@ -131,6 +142,17 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private const float TendrilDuration = 0.75f;
         private const int MaxTendrilBlasts = 12;
         private const float SightGrace = 0.5f;
+        // The comet, a showpiece being tried for the Firecaller's Regalia (CometDash; the user, 2026-11-13: "I want to try
+        // all 3 of them on"): a dodge with the staff in hand, as Lightning Step and with its numbers until the user says
+        // otherwise (12 m, 20 eitr, half the beam's hit to the enemies within 1.5 m of the way). Its streak shows half a
+        // second, its burst is the blast's effect 2.5 m around (a level 11 blast's size), and the way burns for 3 s
+        private const float CometDistance = 12f;
+        private const float CometEitr = 20f;
+        private const float CometDamage = 0.5f;
+        private const float CometWidth = 1.5f;
+        private const float CometStreak = 0.5f;
+        private const float CometBurst = 2.5f;
+        private const float CometBurn = 3f;
         // The staff's model by its level: the Incinerator's look at level 15. Its black swirls come in pairs: around the
         // head at 5, the lower shaft at 10, the butt at 15; they glow half as much as made at 5 and turn half as fast,
         // fully at 15. The head's flame crystal glows 35% at level 1, the butt's crystal 5%, the collar's shards 30%, all
@@ -150,6 +172,9 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private const float EmbersStart = 0.5f;
         private const float MaxEmbers = 2f;
 
+        // How the staff's fire is drawn, for the Firecaller's Regalia's wings and sigil (ChannelWings, ChannelSigil)
+        internal static BeamLook Look { get; private set; }
+
         internal static void Add()
         {
             GameObject embers = PrefabManager.Cache.GetPrefab<GameObject>(BaseStaff);
@@ -162,6 +187,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
 
             Transform container = StaffEffects.Container;
             BeamLook look = CreateLook(container);
+            Look = look;
+            ChannelSigil.Prepare();
             GameObject shot = StaffEffects.AddWithoutParticles(ShotName, ShotPrefab);
             GameObject flamesSource = Plugin.Assets.LoadAsset<GameObject>(FlamesPrefab);
             if (!flamesSource)
@@ -219,13 +246,22 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             // Both attacks are the Incinerator's flamethrower (the Staff of Frost's animation, the staff held forward,
             // looping while the button is down): a beam a second, or a puff of flames every 0.2 s
             Attack held = shared.m_secondaryAttack;
-            shared.m_attack = HeldAttack(held, beam, BeamEitr, BeamInterval, 1f);
-            shared.m_secondaryAttack = HeldAttack(held, jet.gameObject, FlameEitr, FlameInterval, FlameDamage);
+            shared.m_attack = HeldAttack(held, beam, BeamEitr, BeamInterval, 1f, BeamSkillRaise);
+            shared.m_secondaryAttack = HeldAttack(held, jet.gameObject, FlameEitr, FlameInterval, FlameDamage, FlameSkillRaise);
             SecondaryUnlock.Add(shared, FlameLevel);
             // Each shot costs its own eitr: a puff not the beam's
             AttackEitr.Add(shared);
             // A quick click still shoots once
             FirstShot.Add(shared);
+            // With the Firecaller's Regalia, a dodge is the comet (being tried)
+            CometDash.s_staff = shared.m_name;
+            CometDash.s_status = Armor.StormcallerArmor.FireSetBonus.GetStableHashCode();
+            CometDash.s_comet = AddComet(container, beam.GetComponent<FireBeam>());
+            CometDash.s_leaveEffects = new[] { shot };
+            CometDash.s_distance = CometDistance;
+            CometDash.s_eitr = CometEitr;
+            CometDash.s_damage = CometDamage;
+            CometDash.s_width = CometWidth;
 
             CustomItem item = new CustomItem(staff, false, new ItemConfig
             {
@@ -254,9 +290,10 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         }
 
         // The Incinerator's flamethrower attack shooting `projectile` every `interval` seconds while held, each shot taking
-        // `eitr` and dealing the staff's damage times `damage`, aimed straight at the crosshair. Its effects are Magic
-        // Supremacy's, which aren't registered here: the shots make their own
-        internal static Attack HeldAttack(Attack held, GameObject projectile, float eitr, float interval, float damage)
+        // `eitr` and dealing the staff's damage times `damage`, aimed straight at the crosshair, and raising the staff's
+        // skill by `skillRaise` when it hits a character (the flamethrower's own 0.2 suits a puff every 0.2 s, not a shot
+        // a second). Its effects are Magic Supremacy's, which aren't registered here: the shots make their own
+        internal static Attack HeldAttack(Attack held, GameObject projectile, float eitr, float interval, float damage, float skillRaise)
         {
             Attack attack = held.Clone();
             attack.m_attackProjectile = projectile;
@@ -264,6 +301,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             attack.m_perBurstResourceUsage = true;
             attack.m_burstInterval = interval;
             attack.m_damageMultiplier = damage;
+            attack.m_raiseSkillAmount = skillRaise;
             attack.m_projectileAccuracy = 0f;
             attack.m_projectileAccuracyMin = 0f;
             attack.m_launchAngle = 0f;
@@ -413,6 +451,22 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             PrefabManager.Instance.AddPrefab(go);
             beam.m_channel = go;
             beam.m_channelStatus = Armor.StormcallerArmor.FireSetBonus.GetStableHashCode();
+        }
+
+        // What every game sees of the Firecaller's Regalia's comet: networked, so that every game draws it
+        private static GameObject AddComet(Transform container, FireBeam beam)
+        {
+            GameObject go = new GameObject(CometName);
+            go.transform.SetParent(container, false);
+            go.AddComponent<ZNetView>();
+            FireComet comet = go.AddComponent<FireComet>();
+            comet.m_beam = beam;
+            comet.m_streakDuration = CometStreak;
+            comet.m_burstRadius = CometBurst;
+            comet.m_burnTime = CometBurn;
+            comet.m_lifetime = CometBurn + 2f;
+            PrefabManager.Instance.AddPrefab(go);
+            return go;
         }
     }
 }

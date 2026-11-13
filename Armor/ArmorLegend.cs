@@ -28,7 +28,15 @@ namespace NhxMagicWeapons.Armor
             Signature = 2,
             Cloak = 4,
             Runes = 8,
-            All = Particles | Signature | Cloak | Runes,
+            // The Firecaller's Regalia's showpieces (the user, 2026-11-13: "there's nothing that really makes me say 'wow,
+            // that's so cool'", then "I want to try all 3 of them on", and having tried them: "I like the visuals"): a
+            // sigil on the ground and wings of flame while the Wrath of Muspelheim's beam is channelled (ChannelSigil,
+            // ChannelWings, held up by FireChannel), from SigilFrom and WingsFrom; and a dodge as a comet (CometDash), at
+            // any level, as Stormcaller's Raiment's Lightning Step
+            Wings = 16,
+            Sigil = 32,
+            Comet = 64,
+            All = Particles | Signature | Cloak | Runes | Wings | Sigil | Comet,
         }
 
         // What this game shows, whether only with the set's staff in hand (not decided yet), and the level shown for the
@@ -36,11 +44,17 @@ namespace NhxMagicWeapons.Armor
         internal static Ideas s_ideas = Ideas.All;
         internal static bool s_staffOnly;
         internal static int s_previewLevel;
+        // The local player's wings and sigil held up without a channel, to look at them (nhx_armorlook show)
+        internal static bool s_showpieces;
 
         // From which level each shows, and the level where they're at their fullest (higher levels look the same)
         internal const int ParticlesFrom = 12;
         internal const int SignatureAt = 20;
         internal const int FullLevel = 20;
+        // The Firecaller's sigil and wings (the user, 2026-11-13: "The blink can stay from level 1, like the
+        // Stormcaller's. I think the runes on the ground can appear at level 10 and the wings at level 20")
+        internal const int SigilFrom = 10;
+        internal const int WingsFrom = 20;
 
         private static readonly Dictionary<string, int> s_levelKeys = new Dictionary<string, int>();
 

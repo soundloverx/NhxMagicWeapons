@@ -71,6 +71,50 @@ namespace NhxMagicWeapons.Staves
             }
         }
 
+        // A copy of a Magic Supremacy effect's particle system (without its children) under `parent`, at scale 1: stopped
+        // and empty, looping, in world space, with no bursts, collisions, sub-emitters or lights, for its user to set up.
+        // Null, with a warning that `missing`, if the bundle doesn't have it
+        internal static ParticleSystem CopyParticles(string effect, string path, Transform parent, string missing)
+        {
+            GameObject prefab = Plugin.Assets.LoadAsset<GameObject>(effect);
+            Transform source = prefab ? prefab.transform.Find(path) : null;
+            if (!source || !source.GetComponent<ParticleSystem>())
+            {
+                Plugin.Log.LogWarning($"No {path} in {effect}: {missing}.");
+                return null;
+            }
+            GameObject copy = Object.Instantiate(source.gameObject, parent, false);
+            for (int i = copy.transform.childCount - 1; i >= 0; i--)
+            {
+                Object.DestroyImmediate(copy.transform.GetChild(i).gameObject);
+            }
+            copy.layer = parent.gameObject.layer;
+            copy.transform.localPosition = Vector3.zero;
+            copy.transform.localRotation = Quaternion.identity;
+            copy.transform.localScale = Vector3.one;
+            ParticleSystem particles = copy.GetComponent<ParticleSystem>();
+            particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            ParticleSystem.MainModule main = particles.main;
+            main.loop = true;
+            main.duration = 1f;
+            main.playOnAwake = false;
+            main.prewarm = false;
+            main.startDelay = 0f;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+            main.startSize3D = false;
+            ParticleSystem.EmissionModule emission = particles.emission;
+            emission.enabled = true;
+            emission.SetBursts(new ParticleSystem.Burst[0]);
+            ParticleSystem.CollisionModule collision = particles.collision;
+            collision.enabled = false;
+            ParticleSystem.SubEmittersModule sub = particles.subEmitters;
+            sub.enabled = false;
+            ParticleSystem.LightsModule lights = particles.lights;
+            lights.enabled = false;
+            return particles;
+        }
+
         // A copy of a Magic Supremacy effect with its sounds and lights and none of its particles, registered so that every
         // game can create it. Their particles can be too much on top of a staff's own visuals
         internal static GameObject AddWithoutParticles(string name, string effect)

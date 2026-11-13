@@ -40,7 +40,7 @@ Two Ashlands armor sets of four pieces (hood, robe, greaves, cloak), Magic Supre
 | Greaves | 2 molten cores, 1 asksvin pelvis, 10 flametal | 10 flametal, 2 celestial feathers |
 | Cloak | 10 asksvin hides, 10 flametal, 4 celestial feathers | 10 flametal, 2 celestial feathers |
 
-Each piece has 22 armor and 2 more a level (the cloak 3, and 1 more), and eitr regen: +32% the hood, +54% the robe and the greaves, +12% the cloak (+152% in all). The cloak makes you 9% faster and resistant to lightning (the Firecaller's to fire), and the greaves slightly resistant to frost.
+Each piece has 22 armor and 2 more a level (the cloak 3, and 1 more), and eitr regen: +32% the hood, +54% the robe and the greaves, +12% the cloak (+152% in all). The cloak makes you 9% faster and resistant to lightning (the Firecaller's to fire), and the greaves resistant to frost.
 
 The whole set (all four pieces) gives +100% eitr regen (+252% with the pieces'; like any eitr regen, it stops while you attack), and +1% lightning damage (Stormcaller) or fire damage (Firecaller) for each level of its least upgraded piece. The sets' crystals glow fully only while you have the whole set on and hold its staff.
 
@@ -54,6 +54,15 @@ The whole set (all four pieces) gives +100% eitr regen (+252% with the pieces'; 
 
 - **Channelled beam:** hold the attack and the beam stays on, as a thread from the staff's head that sticks to the first enemy it touches and follows it around. Every second, for the beam's 30 eitr, the enemy takes the beam's hit and blast, and fire tendrils shoot from it to every other enemy within 20 m in its sight, each taking the full hit and blasting too. When the enemy dies, goes beyond 50 m or out of sight for half a second, the beam takes the next one where you aim. With no enemy held, it burns what it touches as the beam does.
 - **Blue flamethrower:** the flamethrower burns blue and reaches 20% farther (8.4 m at level 5, 14.4 m at 20).
+
+### Legendary looks
+
+Refined past level 10, the sets start to show it, with the whole set on. What counts is the set's level, its least upgraded piece's, and other players see it too. An armor stand doesn't show any of it.
+
+- **From level 12:** the Firecaller's Regalia gives off embers from the shoulders, the hood and the hem, more as you walk; sparks crawl around Stormcaller's Raiment, and its robe's crystal crackles now and then even without the staff, more often in a thunderstorm. A quarter of them at 12, all of them at 20.
+- **From 12 to 18, the Firecaller's Regalia:** runes light up on its gems and bands, the shoulders at 12, the robe at 14, the greaves at 16, the hood at 18.
+- **From level 15:** the cloak's cloth takes a pattern, storm clouds or dark ember veins. From 20 it glows faintly, with a slow pulse.
+- **At level 20:** flames at the hood's eyes and embers at each step (Firecaller), or three crystal shards circling the shoulders with arcs between them (Stormcaller).
 
 ## Installing
 

@@ -20,7 +20,7 @@ namespace NhxMagicWeapons
     {
         internal const string PluginGuid = "NhxMagicWeapons";
         private const string PluginName = "NhxMagicWeapons";
-        private const string PluginVersion = "1.1.0";
+        private const string PluginVersion = "1.2.0";
 
         // What the mod uses of Magic Supremacy 3.1.5's asset bundle (Tools\slim_bundle.py), embedded in the DLL
         private const string BundleResource = "nhx_magic_weapons";
@@ -47,6 +47,7 @@ namespace NhxMagicWeapons
             CommandManager.Instance.AddConsoleCommand(new ItemLevelCommand());
             CommandManager.Instance.AddConsoleCommand(new ArmorLookCommand());
             CommandManager.Instance.AddConsoleCommand(new ArmorLevelCommand());
+            CommandManager.Instance.AddConsoleCommand(new BeamOrbitCommand());
             new Harmony(PluginGuid).PatchAll(typeof(Plugin).Assembly);
             PrefabManager.OnVanillaPrefabsAvailable += AddItems;
             PrefabManager.OnPrefabsRegistered += AudioRouting.Apply;

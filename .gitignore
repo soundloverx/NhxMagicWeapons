@@ -35,5 +35,8 @@ Desktop.ini
 $RECYCLE.BIN/
 CLAUDE.md
 
+# Python's compiled files (Tools)
+__pycache__/
+
 # Mod packaging output (if you zip builds for Thunderstore, etc.)
 *.zip

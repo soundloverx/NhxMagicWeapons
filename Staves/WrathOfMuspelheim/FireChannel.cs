@@ -1,3 +1,4 @@
+using NhxMagicWeapons.Armor;
 using NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects;
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,7 +18,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
     //   Without an enemy, what it touches takes the beam's hit and the blast, as from the beam.
     // The caster's game creates it at the first shot (Tick, from FireBeam.Setup), aims it every frame and deals the hits;
     // its ZDO tells every game (that one too) whom or where the thread goes, and each tick's blast and tendrils, which
-    // every game draws. The caster's game destroys it when the attack ends.
+    // every game draws. When the attack ends, the thread and its sound go at once on every game, and the caster's game
+    // destroys the channel once what its last tick began is over (End).
     internal class FireChannel : MonoBehaviour
     {
         // The staff's beam (its prefab): its range, look, blast, sound
@@ -42,7 +44,12 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private static readonly int s_blastKey = "nhx_channel_blast".GetStableHashCode();
         private static readonly int s_blastedKey = "nhx_channel_blasted".GetStableHashCode();
         private static readonly int s_tendrilsKey = "nhx_channel_tendrils".GetStableHashCode();
+        // The attack is over: no thread any more, only the last tick's tendrils (End)
+        private static readonly int s_overKey = "nhx_channel_over".GetStableHashCode();
         private const float EndMoved = 0.1f;
+        // After its attack ends, the channel stays until its last tick's tendrils have shown, and this much longer for
+        // the games that got the tick late
+        private const float OverMargin = 0.5f;
 
         // On the caster's game: each caster's channel
         private static readonly Dictionary<Character, FireChannel> s_channels = new Dictionary<Character, FireChannel>();
@@ -64,6 +71,12 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private ZDOID m_shownTargetId = ZDOID.None;
         private Character m_shownTarget;
         private Vector3 m_shownEnd;
+        // The attack is over, and the thread hidden
+        private bool m_hidden;
+        // The caster's Firecaller's Regalia's level, for its sigil and wings, looked at this often
+        private const float SetLevelInterval = 0.25f;
+        private int m_setLevel;
+        private float m_setLevelTimer;
         private readonly List<Tendril> m_tendrils = new List<Tendril>();
 
         // On the caster's game
@@ -78,6 +91,9 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
         private float m_unseen;
         private float m_lastTick;
         private int m_tick;
+        // Its attack is over: it waits for its last tick's tendrils, until this time
+        private bool m_over;
+        private float m_overUntil;
         private readonly List<Character> m_tendrilTargets = new List<Character>();
         private HitData m_tendrilHit;
         private Vector3 m_tendrilFrom;
@@ -346,13 +362,26 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             }
             if (m_isCaster)
             {
-                if (!m_owner || m_owner.IsDead() || !Attacking() || Time.time - m_lastTick > m_tickTimeout)
+                if (m_over)
                 {
-                    End();
-                    return;
+                    if (!m_owner || Time.time >= m_overUntil)
+                    {
+                        Remove();
+                        return;
+                    }
                 }
-                Aim();
-                WriteAim(m_nview.GetZDO());
+                else if (!m_owner || m_owner.IsDead() || !Attacking() || Time.time - m_lastTick > m_tickTimeout)
+                {
+                    if (!End())
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    Aim();
+                    WriteAim(m_nview.GetZDO());
+                }
                 HitTendrils();
             }
             else if (m_nview.IsOwner())
@@ -364,12 +393,32 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             Draw(Time.deltaTime);
         }
 
-        private void End()
+        // The attack is over: the thread goes at once (every game hides it and ends its sound), but the channel stays for
+        // what its last tick began: its tendrils' hits and explosions, and long enough for the other games to get that
+        // tick at all (as a beam's ZDO outlives its shot, FireBeam.m_lifetime). A tap's attack ends the frame after its
+        // tick: destroyed then, as it was, the channel never dealt its tendrils' hits (to enemies the blast had spared
+        // for them) nor drew them, and the other games rarely saw anything of it (found reading the code, 2026-11-13).
+        // A caster gone or dead takes it away at once. Returns whether it stays
+        private bool End()
         {
             if (m_owner && s_channels.TryGetValue(m_owner, out FireChannel channel) && channel == this)
             {
                 s_channels.Remove(m_owner);
             }
+            float until = m_lastTick + Mathf.Max(m_beam.m_lifetime, m_tendrilDelay + m_tendrilDuration + OverMargin);
+            if (!m_owner || m_owner.IsDead() || Time.time >= until)
+            {
+                Remove();
+                return false;
+            }
+            m_over = true;
+            m_overUntil = until;
+            m_nview.GetZDO().Set(s_overKey, true);
+            return true;
+        }
+
+        private void Remove()
+        {
             m_isCaster = false;
             ZNetScene.instance.Destroy(gameObject);
         }
@@ -423,11 +472,50 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
                 m_seenTick = tick;
                 OnTick(zdo);
             }
-            float flare = m_flareAge < 10f * m_flareTime ? Mathf.Exp(-m_flareAge / m_flareTime) : 0f;
-            m_thread.DrawThread(m_age, start, bend, m_shownEnd, flare);
-            if (m_sound)
+            if (zdo.GetBool(s_overKey))
             {
-                m_sound.Follow(start, m_age, m_flareAge);
+                // The attack is over: only the last tick's tendrils go on
+                if (!m_hidden)
+                {
+                    m_hidden = true;
+                    m_thread.Hide();
+                    if (m_sound)
+                    {
+                        m_sound.End();
+                        m_sound = null;
+                    }
+                }
+            }
+            else
+            {
+                float flare = m_flareAge < 10f * m_flareTime ? Mathf.Exp(-m_flareAge / m_flareTime) : 0f;
+                m_thread.DrawThread(m_age, start, bend, m_shownEnd, flare);
+                if (m_sound)
+                {
+                    m_sound.Follow(start, m_age, m_flareAge);
+                }
+                // The Firecaller's Regalia's showpieces, for as long as the thread shows: from the set's level 10, a
+                // sigil on the ground under the caster, a ring more with each of the first hits; at 20, wings of flame
+                // from the third hit on (ArmorLegend.SigilFrom, WingsFrom). They fold and fade by themselves when this
+                // stops holding them up. The set's level is the caster's game's, shared through the caster's ZDO
+                // (ArmorLegend.Level), looked at now and then
+                if (m_caster)
+                {
+                    m_setLevelTimer -= dt;
+                    if (m_setLevelTimer <= 0f)
+                    {
+                        m_setLevelTimer = SetLevelInterval;
+                        m_setLevel = ArmorLegend.Level(m_caster, StormcallerArmor.FireSet);
+                    }
+                    if (m_setLevel >= ArmorLegend.SigilFrom && ArmorLegend.On(ArmorLegend.Ideas.Sigil))
+                    {
+                        ChannelSigil.Hold(m_caster, tick, flare);
+                    }
+                    if (m_setLevel >= ArmorLegend.WingsFrom && ArmorLegend.On(ArmorLegend.Ideas.Wings))
+                    {
+                        ChannelWings.Hold(m_caster, tick >= ChannelWings.OpenAtTick, flare);
+                    }
+                }
             }
             DrawTendrils();
         }
@@ -448,7 +536,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             // The tendrils as many strands as the thread, and as wide
             m_tendrilSize = size;
             m_shownEnd = transform.position;
-            if (ZNet.instance && !ZNet.instance.IsDedicated())
+            // No sound for a channel that's over already when this game gets it (a tap: its shot's sound is its own effect)
+            if (ZNet.instance && !ZNet.instance.IsDedicated() && !zdo.GetBool(s_overKey))
             {
                 m_sound = ChannelSound.Create(this, SoundTemplate());
             }

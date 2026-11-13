@@ -84,7 +84,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             }
             dir.Normalize();
             Vector3 start = player.transform.position;
-            if (!Walk(player, start, dir, out Vector3 end))
+            if (!Walk(player, start, dir, s_distance, out Vector3 end))
             {
                 return false;
             }
@@ -113,15 +113,16 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             return true;
         }
 
-        // The farthest spot the player can blink to along `dir`, walked in steps from `start` (their feet)
-        private static bool Walk(Player player, Vector3 start, Vector3 dir, out Vector3 end)
+        // The farthest spot the player can blink to along `dir`, within `reach`, walked in steps from `start` (their feet).
+        // The Firecaller's Regalia's comet goes the same way (CometDash)
+        internal static bool Walk(Player player, Vector3 start, Vector3 dir, float reach, out Vector3 end)
         {
             CapsuleCollider capsule = player.GetCollider() as CapsuleCollider;
             float radius = capsule ? capsule.radius : 0.4f;
             float height = capsule ? capsule.height : 1.8f;
             float water = ZoneSystem.instance ? ZoneSystem.instance.m_waterLevel : float.MinValue;
             Vector3 last = start;
-            for (float distance = Step; distance <= s_distance + 0.001f; distance += Step)
+            for (float distance = Step; distance <= reach + 0.001f; distance += Step)
             {
                 Vector3 probe = start + dir * distance;
                 probe.y = last.y;

@@ -31,7 +31,8 @@ namespace NhxMagicWeapons.Armor
         private const string StormPrefix = "NhxStormcaller";   // NhxStormcallerHood..., $item_nhx_stormcaller_hood...
         private const string FirePrefix = "NhxFirecaller";
         private const string StormSet = "NhxStormcallersRaiment";
-        private const string FireSet = "NhxFirecallersRegalia";
+        // The Firecaller's Regalia's name, whose level the channel's sigil and wings go by (FireChannel)
+        internal const string FireSet = "NhxFirecallersRegalia";
 
         // The Firecaller's Regalia's set bonus: its status effect's name, which the Wrath of Muspelheim looks for. Eitr
         // regen +100%: the game adds it to the pieces' own (+152% now), for +252% in all; and like any eitr regen, it
@@ -148,6 +149,8 @@ namespace NhxMagicWeapons.Armor
                     {
                         Armor = 22, ArmorPerLevel = 2, EitrRegen = 0.54f, Durability = 1000, DurabilityPerLevel = 200,
                         Weight = 5, Movement = 0,
+                        // The user's own change (2026-11-13: "those were my manual changes"): Magic Supremacy's greaves
+                        // are slightly resistant
                         Resistances = new[] { Resists(HitData.DamageType.Frost, HitData.DamageModifier.Resistant) },
                     };
                 default: // Cloak

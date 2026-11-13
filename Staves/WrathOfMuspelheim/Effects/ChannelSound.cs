@@ -133,6 +133,13 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             m_envelope = pulse + swell;
         }
 
+        // The channel's attack is over, though its object stays a moment more for its last tendrils: the sound ends as
+        // when the channel is gone
+        internal void End()
+        {
+            m_channel = null;
+        }
+
         private void Update()
         {
             if (!m_ending && !m_channel)

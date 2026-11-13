@@ -143,6 +143,10 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         private const float StormEitr = 30f;
         private const float StormInterval = 1f;
         private const float StormDamage = 1f;
+        // Elemental Magic raised by each second's rain that strikes a character: as the bolt (the Staff of Embers' 1). The
+        // Incinerator's looping attack has 0.2, for its puffs every 0.2 s: the storm raised it 5 times slower until
+        // 2026-11-13
+        private const float StormSkillRaise = 1f;
         private const float StormRadius = 7f;
         private const float StormSpeed = 12f;
         private const float StormHeight = 16f;
@@ -204,7 +208,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             ItemDrop.ItemData.SharedData shared = staff.GetComponent<ItemDrop>().m_itemData.m_shared;
             ItemDrop.ItemData.SharedData baseShared = embers.GetComponent<ItemDrop>().m_itemData.m_shared;
             shared.m_name = NameKey;
-            shared.m_description = "$item_nhx_staffstorms_description   ";
+            shared.m_description = "$item_nhx_staffstorms_description";
             shared.m_damages = new HitData.DamageTypes { m_lightning = Lightning };
             shared.m_damagesPerLevel = new HitData.DamageTypes { m_lightning = LightningPerLevel };
             float northLightning = NorthLightningPerLevel - LightningPerLevel;
@@ -269,7 +273,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             if (heldAttack != null && eyeTick)
             {
                 StormEye.SetUp(shared, Armor.StormcallerArmor.StormSetBonus,
-                    WrathOfMuspelheim.Staff.HeldAttack(heldAttack, eyeTick, StormEitr, StormInterval, StormDamage));
+                    WrathOfMuspelheim.Staff.HeldAttack(heldAttack, eyeTick, StormEitr, StormInterval, StormDamage, StormSkillRaise));
             }
             else
             {

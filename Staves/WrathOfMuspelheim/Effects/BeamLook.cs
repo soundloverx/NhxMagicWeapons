@@ -13,13 +13,24 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         public Material m_coreMaterial;
         public Material m_sheathMaterial;
         public Material m_glowMaterial;
-        public Color m_coreColor = new Color(1f, 0.86f, 0.55f, 1f);
         public Color m_sheathColor = new Color(1f, 0.42f, 0.08f, 0.5f);
         public Color m_glowColor = new Color(1f, 0.38f, 0.06f, 0.9f);
         public Color m_lightColor = new Color(1f, 0.55f, 0.2f);
+        // The main beam and its weavers (FireBeams; the numbers of the drawings the user picked, 2026-11-13: "I love the
+        // core and weavers version"). The main beam's core is this many times a strand's width, and whiter than the equal
+        // beams' cores were (1, 0.86, 0.55); its sheath is m_sheathColor. The weavers' cores and sheaths are this share
+        // of a strand's, in deeper oranges, so that they read as thin lines around it. The glow, along the main beam, is
+        // this share of the width it had around equal beams
+        public float m_mainSize = 1.5f;
+        public Color m_mainColor = new Color(1f, 0.93f, 0.74f, 1f);
+        public float m_weaverSize = 0.5f;
+        public float m_weaverSheathSize = 0.45f;
+        public Color m_weaverColor = new Color(1f, 0.66f, 0.24f, 1f);
+        public Color m_weaverSheathColor = new Color(1f, 0.36f, 0.05f, 0.5f);
+        public float m_mainGlow = 0.8f;
 
-        // Its size by level (Size); higher levels look like m_maxLevel. The beams side by side are m_strandSize wide (of a
-        // full beam) at the level the last one came, and m_strandSizePerLevel more at each level after, up to
+        // Its size by level (Size); higher levels look like m_maxLevel. Its strands (the main beam and its weavers, each
+        // its own share of this, above) are m_strandSize wide (of a full beam) at the level the last one came, and m_strandSizePerLevel more at each level after, up to
         // m_maxStrandSize. The sheath and the glow around them and the light where they end are m_glowSize big at level 1,
         // and m_glowSizePerLevel more at each level
         public int m_maxLevel = 20;
@@ -85,7 +96,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         }
     }
 
-    // What a beam is made of: its strands side by side and their width (of a full beam), and the size of its glow and light
+    // What a beam is made of: its strands (the main beam, then its weavers) and their width (of a full beam), and the size
+    // of its glow and light
     internal struct BeamSize
     {
         public int m_strands;
