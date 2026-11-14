@@ -34,7 +34,5 @@
   "se_nhx_firecaller_weakness": "Each hit of the Wrath of Muspelheim lowers fire resistance one more step, down to very weak, for",
   "se_nhx_stormcaller_weakness": "Each hit of the Staff of Storms lowers lightning resistance one more step, down to very weak, for",
   "se_nhx_fireweakness": "Fire weakness",
-  "se_nhx_fireweakness_tooltip": "Lowers the fire resistance of enemies hit by one step for",
-  "se_nhx_lightningweakness": "Lightning weakness",
-  "se_nhx_lightningweakness_tooltip": "Lowers the lightning resistance of enemies hit by one step for"
+  "se_nhx_lightningweakness": "Lightning weakness"
 }

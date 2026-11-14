@@ -10,10 +10,10 @@ namespace NhxMagicWeapons.Armor
     // skill), and shows it in the effect's tooltip ("Fire: +3%"). The staves look for the sets' effects by their names
     // (StormcallerArmor.FireSetBonus, StormSetBonus).
     // And with the set's staff in hand, each hit leaves what it hits one more step weaker to the element (the user,
-    // 2026-11-11: "with the armor set bonus, lower resistance by one step per hit instead"; Staves\ElementWeakness): its
-    // attacks' HitData carry the set's stacking weakness in place of the staff's own (SEMan.ModifyAttack, which every
-    // attack's HitData goes through after Attack sets the staff's, and Lightning Step's), and every hit made from them
-    // keeps it (chain jumps, blasts, tendrils, the storm, flames)
+    // 2026-11-11: "with the armor set bonus, lower resistance by one step per hit instead"; Staves\ElementWeakness), the
+    // staff alone none (2026-11-14: "it should only be active when paired with the staff's respective armor set"): its
+    // attacks' HitData carry the set's weakness (SEMan.ModifyAttack, which every attack's HitData goes through, Lightning
+    // Step's and the comet's too), and every hit made from them keeps it (chain jumps, blasts, tendrils, the storm, flames)
     internal class LevelSetBonus : SE_Stats
     {
         // The pieces counted, the element, and its damage per level of the least upgraded

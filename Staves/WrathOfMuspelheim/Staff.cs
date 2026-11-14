@@ -15,7 +15,6 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
     {
         internal const string ItemName = "NhxStaffMuspelheim";
         internal const string NameKey = "$item_nhx_staffmuspelheim";
-        private const string WeaknessName = "SE_NhxFireWeakness";
         private const string BeamName = "NhxMuspelBeam";
         private const string JetName = "NhxMuspelJet";
         private const string FlamesName = "NhxMuspelFlames";
@@ -218,10 +217,10 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
                 new LevelDamage.Step(SpiritLevel, new HitData.DamageTypes { m_spirit = Spirit }, new HitData.DamageTypes { m_spirit = SpiritPerLevel }),
                 new LevelDamage.Step(NorthLevel, new HitData.DamageTypes { m_fire = NorthFire }, new HitData.DamageTypes { m_fire = NorthFireBonusPerLevel }));
             shared.m_attackForce = AttackForce;
-            // Its hits leave what they hit a step weaker to fire for a while (ElementWeakness)
-            Sprite icon = shared.m_icons != null && shared.m_icons.Length > 0 ? shared.m_icons[0] : null;
-            shared.m_attackStatusEffect = ElementWeakness.Add(WeaknessName, "$se_nhx_fireweakness", "$se_nhx_fireweakness_tooltip", HitData.DamageType.Fire, false, icon);
-            shared.m_attackStatusEffectChance = 1f;
+            // No weakness of its own: its hits lower fire resistance only with the Firecaller's Regalia on (the user,
+            // 2026-11-14: "it should only be active when paired with the staff's respective armor set"; LevelSetBonus).
+            // Null, in case the cloned Incinerator brings one
+            shared.m_attackStatusEffect = null;
             // The beam's blast radius and the flamethrower's reach, for the staff's level
             shared.m_projectileToolTip = true;
             // The rest as the Staff of Embers

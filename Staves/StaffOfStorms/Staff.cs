@@ -15,7 +15,6 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
     {
         internal const string ItemName = "NhxStaffStorms";
         internal const string NameKey = "$item_nhx_staffstorms";
-        private const string WeaknessName = "SE_NhxLightningWeakness";
         private const string BoltName = "NhxStormBolt";
         private const string CallName = "NhxStormCall";
         private const string StrikeName = "NhxStormStrike";
@@ -217,10 +216,10 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
                 new LevelDamage.Step(SpiritLevel, new HitData.DamageTypes { m_spirit = Spirit }, new HitData.DamageTypes { m_spirit = SpiritPerLevel }),
                 new LevelDamage.Step(FireLevel, new HitData.DamageTypes { m_fire = Fire }, new HitData.DamageTypes { m_fire = FirePerLevel }));
             shared.m_attackForce = AttackForce;
-            // Its hits leave what they hit a step weaker to lightning for a while (ElementWeakness)
-            Sprite icon = shared.m_icons != null && shared.m_icons.Length > 0 ? shared.m_icons[0] : null;
-            shared.m_attackStatusEffect = ElementWeakness.Add(WeaknessName, "$se_nhx_lightningweakness", "$se_nhx_lightningweakness_tooltip", HitData.DamageType.Lightning, false, icon);
-            shared.m_attackStatusEffectChance = 1f;
+            // No weakness of its own: its hits lower lightning resistance only with Stormcaller's Raiment on (the user,
+            // 2026-11-14: "it should only be active when paired with the staff's respective armor set"; LevelSetBonus).
+            // Null, in case the cloned Thundersurge brings one
+            shared.m_attackStatusEffect = null;
             // The bolt's chain lightning, for the staff's level
             shared.m_projectileToolTip = true;
             // The rest as the Staff of Embers

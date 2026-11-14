@@ -48,8 +48,8 @@ namespace NhxMagicWeapons.Armor
         private const float StormSetEitrRegen = 2f;
         private const float StormSetLightningPerLevel = 0.01f;
 
-        // Both sets: with the staff in hand, each hit leaves what it hits one more step weaker to the element, where the
-        // staff alone gives one step (the user, 2026-11-11; Staves\ElementWeakness, through LevelSetBonus)
+        // Both sets: with the staff in hand, each hit leaves what it hits one more step weaker to the element (the user,
+        // 2026-11-11); the staff alone gives none since 2026-11-14 (Staves\ElementWeakness, through LevelSetBonus)
         private const string FireWeakness = "SE_NhxFireWeaknessStacking";
         private const string StormWeakness = "SE_NhxLightningWeaknessStacking";
 
@@ -231,7 +231,7 @@ namespace NhxMagicWeapons.Armor
             bonus.m_icon = icons != null && icons.Length > 0 ? icons[0] : null;
             bonus.m_staff = Staves.StaffOfStorms.Staff.NameKey;
             bonus.m_weakness = Staves.ElementWeakness.Add(StormWeakness, "$se_nhx_lightningweakness", "$se_nhx_stormcaller_weakness",
-                HitData.DamageType.Lightning, true, bonus.m_icon);
+                HitData.DamageType.Lightning, bonus.m_icon);
             ItemManager.Instance.AddStatusEffect(new CustomStatusEffect(bonus, false));
             return bonus;
         }
@@ -253,7 +253,7 @@ namespace NhxMagicWeapons.Armor
             bonus.m_icon = colors != null ? colors.Icon(icon) : icon;
             bonus.m_staff = Staves.WrathOfMuspelheim.Staff.NameKey;
             bonus.m_weakness = Staves.ElementWeakness.Add(FireWeakness, "$se_nhx_fireweakness", "$se_nhx_firecaller_weakness",
-                HitData.DamageType.Fire, true, bonus.m_icon);
+                HitData.DamageType.Fire, bonus.m_icon);
             ItemManager.Instance.AddStatusEffect(new CustomStatusEffect(bonus, false));
             return bonus;
         }
