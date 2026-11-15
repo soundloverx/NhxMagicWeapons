@@ -39,7 +39,7 @@ namespace NhxMagicWeapons
         {
             Log = Logger;
             TwinsFightLog = Config.Bind("Debug", "Twins fight log", false,
-                "Write the Stormcaller and Firecaller fight to BepInEx's LogOutput.log: every hit on the twins and on your character near them (from whom, with what, resistances, damage taken), and the fight's events (targets, voice lines, deaths, raises, holds, swaps). For testing and balancing.");
+                "Write the Stormcaller and Firecaller fight to BepInEx's LogOutput.log: every hit on the twins and on your character near them (from whom, with what, resistances, damage taken), and the fight's events (targets, voice lines, deaths, raises, holds, swaps, stacks, Stormstruck and Flamestruck), with a summary when you leave the fight. For testing and balancing.");
 
             s_bundleStream = typeof(Plugin).Assembly.GetManifestResourceStream(BundleResource);
             Assets = s_bundleStream != null ? AssetBundle.LoadFromStream(s_bundleStream) : null;

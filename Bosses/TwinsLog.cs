@@ -20,6 +20,13 @@ namespace NhxMagicWeapons.Bosses
     //   and cause over FlushEvery seconds
     // - Events: summons, roles and targets, voice lines (said, heard, played, dropped), deaths, raises, wins, vanishing,
     //   the second phase and its spells, creatures held, draws and swaps, overloads, judgment, rushes
+    // - The staves' duel (TwinsDuel; the user, 2026-11-15: "when players swap staves, the number of stacks, the hits they
+    //   take and deliver, the vulnerability debuffs"): every stack with both charges (in hand or held) and the regen
+    //   left, every swap with how long the old staff was out and what became of both charges, Stormstruck and
+    //   Flamestruck as they come, grow and wear off with the resistance they leave; on every hit the local player takes,
+    //   what the duel has put on them. The local player's hits on a twin another game runs, as sent (that game logs what
+    //   it took). And when the player leaves the fight (or dies), a summary: time on each staff, swaps, most stacks,
+    //   smites, most steps, damage taken and dealt
     // Off unless the config's "Twins fight log" is on (Plugin.TwinsFightLog; the user, the fight tested: "maybe disable
     // them so as not to spam the player so much")
     internal static class TwinsLog
@@ -66,6 +73,9 @@ namespace NhxMagicWeapons.Bosses
         private class Pending
         {
             internal Character m_target;
+            internal Character m_attacker;
+            // On the local player: what the duel had put on them as it came (TwinsDuel.Describe)
+            internal string m_duel;
             internal HitData.DamageTypes m_raw;
             internal HitData.DamageModifiers m_mods;
             internal string m_from;
@@ -96,6 +106,39 @@ namespace NhxMagicWeapons.Bosses
         private static readonly Dictionary<string, Tally> s_tallies = new Dictionary<string, Tally>();
         private static readonly List<string> s_flushed = new List<string>();
         private static float s_flushTimer = FlushEvery;
+
+        // The local player's fight, for its summary (TwinsDuel.Summarize): what they took, in hits and otherwise, and
+        // what they dealt to twins this game runs (at once, and to burn) or sent to twins another game runs
+        private static int s_hitsTaken;
+        private static float s_takenFromHits;
+        private static float s_takenOther;
+        private static int s_hitsLanded;
+        private static int s_hitsRefused;
+        private static float s_dealtHere;
+        private static float s_burnHere;
+        private static int s_hitsSent;
+        private static float s_sentRaw;
+
+        // As the local player joins the fight (TwinsDuel)
+        internal static void StartFight()
+        {
+            s_hitsTaken = 0;
+            s_takenFromHits = 0f;
+            s_takenOther = 0f;
+            s_hitsLanded = 0;
+            s_hitsRefused = 0;
+            s_dealtHere = 0f;
+            s_burnHere = 0f;
+            s_hitsSent = 0;
+            s_sentRaw = 0f;
+        }
+
+        internal static string FightDamage()
+        {
+            return $"took {s_takenFromHits:0} in {s_hitsTaken} hits and {s_takenOther:0} otherwise (burning, the arcs, the burning way, judgment); "
+                + $"dealt {s_dealtHere:0} at once and {s_burnHere:0} to burn in {s_hitsLanded} hits on twins this game runs ({s_hitsRefused} more refused), "
+                + $"and sent {s_hitsSent} hits ({s_sentRaw:0} before resistances) to twins another game runs (its log has what they took)";
+        }
 
         private static bool Logged(Character character)
         {
@@ -137,6 +180,8 @@ namespace NhxMagicWeapons.Bosses
                 s_pending = new Pending
                 {
                     m_target = __instance,
+                    m_attacker = attacker,
+                    m_duel = __instance == Player.m_localPlayer ? TwinsDuel.Describe(Player.m_localPlayer, false) : null,
                     m_raw = hit.m_damage,
                     m_mods = __instance.GetDamageModifiers(),
                     m_from = Name(attacker) + Wielding(attacker),
@@ -164,6 +209,10 @@ namespace NhxMagicWeapons.Bosses
                     line.Append(" [").Append(pending.m_source).Append(']');
                 }
                 line.Append(": ").Append(Damages(pending.m_raw, pending.m_mods));
+                if (pending.m_duel != null)
+                {
+                    line.Append(" [on them: ").Append(pending.m_duel).Append(']');
+                }
                 if (pending.m_staggered)
                 {
                     line.Append(", staggered (x2)");
@@ -207,6 +256,57 @@ namespace NhxMagicWeapons.Bosses
                 }
                 line.Append("; ").Append(Health(__instance));
                 Event(line.ToString());
+                Count(pending);
+            }
+        }
+
+        // For the fight's summary
+        private static void Count(Pending pending)
+        {
+            Player local = Player.m_localPlayer;
+            if (!local)
+            {
+                return;
+            }
+            if (pending.m_target == local && pending.m_refused == null)
+            {
+                s_hitsTaken++;
+                s_takenFromHits += pending.m_took;
+            }
+            else if (pending.m_attacker == local && CallerBoss.IsTwin(pending.m_target))
+            {
+                if (pending.m_refused != null)
+                {
+                    s_hitsRefused++;
+                    return;
+                }
+                s_hitsLanded++;
+                s_dealtHere += pending.m_took;
+                s_burnHere += pending.m_fire + pending.m_spirit;
+            }
+        }
+
+        // The local player's hits on a twin another game runs, as they leave: that game takes them (and logs them). Its
+        // resistances aren't known here (its effects are on that game), so the damage is as sent
+        [HarmonyPatch(typeof(Character), nameof(Character.Damage))]
+        private static class HitSent
+        {
+            private static void Prefix(Character __instance, HitData hit)
+            {
+                if (!On || hit == null || !CallerBoss.IsTwin(__instance) || !__instance.m_nview || !__instance.m_nview.IsValid() || __instance.m_nview.IsOwner())
+                {
+                    return;
+                }
+                Character attacker = hit.GetAttacker();
+                if (!attacker || attacker != Player.m_localPlayer)
+                {
+                    return;
+                }
+                s_hitsSent++;
+                s_sentRaw += hit.GetTotalDamage();
+                string source = Source();
+                Event($"Hit sent to {Name(__instance)} (another game runs it) from {Name(attacker)}{Wielding(attacker)}"
+                    + $"{(string.IsNullOrEmpty(source) ? "" : $" [{source}]")}: {Damages(hit.m_damage, new HitData.DamageModifiers())}.");
             }
         }
 
@@ -246,6 +346,10 @@ namespace NhxMagicWeapons.Bosses
                 if (dealt <= 0f)
                 {
                     return;
+                }
+                if (__instance == Player.m_localPlayer)
+                {
+                    s_takenOther += dealt;
                 }
                 string cause = hit != null && hit.m_hitType == HitData.HitType.Burning
                     ? (hit.m_damage.m_spirit > hit.m_damage.m_fire ? "spirit burning" : "burning")

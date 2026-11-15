@@ -135,6 +135,7 @@
     <Compile Include="Bosses\CallerBosses.cs" />
     <Compile Include="Bosses\ChargeLook.cs" />
     <Compile Include="Bosses\ElementCharge.cs" />
+    <Compile Include="Bosses\SmiteWeakness.cs" />
     <Compile Include="Bosses\ElementRune.cs" />
     <Compile Include="Bosses\Looks.cs" />
     <Compile Include="Bosses\Showroom.cs" />
