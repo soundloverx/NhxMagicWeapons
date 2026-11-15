@@ -114,12 +114,14 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         }
 
         // The farthest spot the player can blink to along `dir`, within `reach`, walked in steps from `start` (their feet).
-        // The Firecaller's Regalia's comet goes the same way (CometDash)
-        internal static bool Walk(Player player, Vector3 start, Vector3 dir, float reach, out Vector3 end)
+        // The Firecaller's Regalia's comet goes the same way (CometDash), and the sets' bosses' blink and comet, with room
+        // for their size (their scale: a player's is 1)
+        internal static bool Walk(Character player, Vector3 start, Vector3 dir, float reach, out Vector3 end)
         {
             CapsuleCollider capsule = player.GetCollider() as CapsuleCollider;
-            float radius = capsule ? capsule.radius : 0.4f;
-            float height = capsule ? capsule.height : 1.8f;
+            float scale = player.transform.localScale.y;
+            float radius = (capsule ? capsule.radius : 0.4f) * scale;
+            float height = (capsule ? capsule.height : 1.8f) * scale;
             float water = ZoneSystem.instance ? ZoneSystem.instance.m_waterLevel : float.MinValue;
             Vector3 last = start;
             for (float distance = Step; distance <= reach + 0.001f; distance += Step)

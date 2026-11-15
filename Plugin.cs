@@ -1,4 +1,5 @@
 using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using Jotunn.Entities;
@@ -27,6 +28,9 @@ namespace NhxMagicWeapons
 
         internal static ManualLogSource Log { get; private set; }
         internal static AssetBundle Assets { get; private set; }
+        // The twins' fight in the log (Bosses\TwinsLog), off unless asked for (the user, 2026-11-15, the fight tested:
+        // "maybe disable them so as not to spam the player so much"; kept for a later round of balancing)
+        internal static ConfigEntry<bool> TwinsFightLog { get; private set; }
 
         // Unity reads the bundle from it as its assets are loaded, so it stays open for as long as the game runs
         private static Stream s_bundleStream;
@@ -34,6 +38,8 @@ namespace NhxMagicWeapons
         private void Awake()
         {
             Log = Logger;
+            TwinsFightLog = Config.Bind("Debug", "Twins fight log", false,
+                "Write the Stormcaller and Firecaller fight to BepInEx's LogOutput.log: every hit on the twins and on your character near them (from whom, with what, resistances, damage taken), and the fight's events (targets, voice lines, deaths, raises, holds, swaps). For testing and balancing.");
 
             s_bundleStream = typeof(Plugin).Assembly.GetManifestResourceStream(BundleResource);
             Assets = s_bundleStream != null ? AssetBundle.LoadFromStream(s_bundleStream) : null;
@@ -48,11 +54,27 @@ namespace NhxMagicWeapons
             CommandManager.Instance.AddConsoleCommand(new ArmorLookCommand());
             CommandManager.Instance.AddConsoleCommand(new ArmorLevelCommand());
             CommandManager.Instance.AddConsoleCommand(new BeamOrbitCommand());
+            CommandManager.Instance.AddConsoleCommand(new BossCommand());
+            CommandManager.Instance.AddConsoleCommand(new AltarCommand());
             new Harmony(PluginGuid).PatchAll(typeof(Plugin).Assembly);
             PrefabManager.OnVanillaPrefabsAvailable += AddItems;
             PrefabManager.OnPrefabsRegistered += AudioRouting.Apply;
+            // The twins' altar, a location: made from the game's Ashlands pieces once they're there
+            ZoneManager.OnVanillaLocationsAvailable += Bosses.TwinsAltars.AddLocation;
+            // The twins' voices, from the DLL (Bosses\EmbeddedAudio)
+            StartCoroutine(Bosses.TwinsVoices.Load());
 
             Log.LogInfo($"{PluginName} v{PluginVersion} loaded.");
+        }
+
+        // The twins' fight, for the local player (its stacks and swaps: Bosses\TwinsDuel)
+        private void Update()
+        {
+            Bosses.TwinsDuel.Update(Time.deltaTime);
+            Bosses.TwinsItems.Update();
+            Bosses.TwinsStasis.Update(Time.deltaTime);
+            Bosses.TwinsVoices.Update();
+            Bosses.TwinsLog.Update(Time.deltaTime);
         }
 
         // The weapons copy settings and effects from the game's own, which are only there once the main menu loads, and the
@@ -62,7 +84,12 @@ namespace NhxMagicWeapons
             PrefabManager.OnVanillaPrefabsAvailable -= AddItems;
             Staves.StaffOfStorms.Staff.Add();
             Staves.WrathOfMuspelheim.Staff.Add();
+            // The twins' drops and lodestone, before the armor whose recipes ask for the drops (they need the staves'
+            // crystals and particles, so after the staves)
+            Bosses.TwinsItems.Add();
             Armor.StormcallerArmor.Add();
+            // They wear the sets
+            Bosses.CallerBosses.Add();
         }
 
         private static void AddLocalizations()

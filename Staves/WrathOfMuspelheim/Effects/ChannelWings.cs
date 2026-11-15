@@ -92,6 +92,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         }
 
         private Character m_wearer;
+        // The wearer's size: a player's 1, the Firecaller boss's 2 (Bosses\TwinsPhase holds them up in its second phase)
+        private float m_scale = 1f;
         private Transform m_chest;
         private BeamLook m_look;
         // The left wing's strands, then the right's
@@ -144,6 +146,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         private void Build(Character wearer, BeamLook look)
         {
             m_wearer = wearer;
+            m_scale = Mathf.Max(0.01f, wearer.transform.localScale.y);
             m_look = look;
             m_chest = FindBone(wearer, "Spine2");
             m_block = new MaterialPropertyBlock();
@@ -174,7 +177,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             m_light = lightObject.AddComponent<Light>();
             m_light.type = LightType.Point;
             m_light.color = look.m_lightColor;
-            m_light.range = LightRange;
+            m_light.range = LightRange * m_scale;
             m_light.intensity = 0f;
             m_light.shadows = LightShadows.None;
             Show(false);
@@ -305,7 +308,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         private void Draw(float dt, float flare, bool opened)
         {
             Quaternion facing = m_wearer.transform.rotation;
-            Vector3 chest = m_chest ? m_chest.position : m_wearer.transform.position + Vector3.up * ChestHeight;
+            Vector3 chest = m_chest ? m_chest.position : m_wearer.transform.position + Vector3.up * ChestHeight * m_scale;
             // How far they're spread (past 1 for a moment as they open), and how bright
             float e = m_spread;
             float alpha = m_alpha * m_flicker;
@@ -313,7 +316,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             float beat = Mathf.Sin(2f * Mathf.PI * BeatRate * m_age);
             float sweep = Mathf.LerpUnclamped(FoldSweep, Sweep, e) * Mathf.Deg2Rad;
             float arm = Mathf.LerpUnclamped(FoldAngle, ArmAngle, e) * Mathf.Deg2Rad;
-            float lengthScale = Mathf.LerpUnclamped(FoldLength, 1f, e);
+            float lengthScale = Mathf.LerpUnclamped(FoldLength, 1f, e) * m_scale;
             Vector3 up = Vector3.up;
             m_block.SetVector(s_mainTexST, new Vector4(1f / FlameLength, 1f, -m_age * FlowSpeed / FlameLength, 0f));
 
@@ -324,7 +327,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
                 // The wing's plane: outward and up; the strands sway mostly across it
                 Vector3 outward = facing * new Vector3(side * Mathf.Cos(sweep), 0f, -Mathf.Sin(sweep));
                 Vector3 across = Vector3.Cross(outward, up) * side;
-                Vector3 root = chest + facing * new Vector3(Root.x * side, Root.y, Root.z);
+                Vector3 root = chest + facing * new Vector3(Root.x * side, Root.y, Root.z) * m_scale;
                 float share = feather.m_share;
                 float angle = Mathf.Lerp(TopAngle, BottomAngle, Mathf.Pow(share, 0.85f)) + (BeatAngle * beat + FlareAngle * flare) * (1f - share);
                 angle = Mathf.LerpUnclamped(FoldAngle, angle, e) * Mathf.Deg2Rad;
@@ -341,7 +344,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
                     feather.m_points[p] = u * u * root + 2f * u * t * control + t * t * tip
                         + across * (sway * (wave + 0.4f * ripple)) + up * (sway * 0.5f * ripple);
                 }
-                float size = feather.m_size * wider;
+                float size = feather.m_size * wider * m_scale;
                 Line(feather.m_core, feather.m_points, CoreWidth * size, m_look.m_mainColor, alpha, true);
                 Line(feather.m_sheath, feather.m_points, SheathWidth * size, m_look.m_sheathColor, alpha, true);
                 Line(feather.m_glow, feather.m_points, GlowWidth * size, m_look.m_glowColor, alpha * GlowAlpha * (1f + flare), false);
@@ -377,7 +380,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
                 }
             }
 
-            m_light.transform.position = chest + facing * new Vector3(0f, 0.3f, -0.5f);
+            m_light.transform.position = chest + facing * new Vector3(0f, 0.3f, -0.5f) * m_scale;
             m_light.intensity = LightIntensity * alpha * (1f + 0.5f * flare);
         }
 

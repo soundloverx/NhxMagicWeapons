@@ -173,6 +173,13 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
 
         // How the staff's fire is drawn, for the Firecaller's Regalia's wings and sigil (ChannelWings, ChannelSigil)
         internal static BeamLook Look { get; private set; }
+        // The flamethrower's flames (orange), networked, made as long as asked (FlameLook): the Firecaller boss's too
+        internal static GameObject Flames { get; private set; }
+        // The beam (for its blast, shown by each game: FireBeam.ShowBlastOfRadius), the shot's sound (networked) and the
+        // staff's icon: the Firecaller boss's sigil and Scorch (Bosses\)
+        internal static FireBeam Beam { get; private set; }
+        internal static GameObject Shot { get; private set; }
+        internal static Sprite Icon { get; private set; }
 
         internal static void Add()
         {
@@ -194,8 +201,11 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             {
                 Plugin.Log.LogWarning($"{FlamesPrefab} isn't in the asset bundle: the Wrath of Muspelheim's flamethrower is invisible.");
             }
-            FlameJet jet = CreateJet(container, AddFlames(flamesSource, FlamesName, false), AddFlames(flamesSource, BlueFlamesName, true));
+            Flames = AddFlames(flamesSource, FlamesName, false);
+            FlameJet jet = CreateJet(container, Flames, AddFlames(flamesSource, BlueFlamesName, true));
             GameObject beam = AddBeam(container, look, shot, CreateBlast(), jet);
+            Shot = shot;
+            Beam = beam.GetComponent<FireBeam>();
             AddChannel(container, beam.GetComponent<FireBeam>());
 
             GameObject staff = PrefabManager.Instance.CreateClonedPrefab(ItemName, model);
@@ -205,6 +215,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             SetUpModel(staff);
 
             ItemDrop.ItemData.SharedData shared = staff.GetComponent<ItemDrop>().m_itemData.m_shared;
+            Icon = shared.m_icons != null && shared.m_icons.Length > 0 ? shared.m_icons[0] : null;
             ItemDrop.ItemData.SharedData baseShared = embers.GetComponent<ItemDrop>().m_itemData.m_shared;
             shared.m_name = NameKey;
             shared.m_description = "$item_nhx_staffmuspelheim_description";

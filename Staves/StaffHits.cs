@@ -125,7 +125,8 @@ namespace NhxMagicWeapons.Staves
         // who don't), though a player can always anger a creature that allows it; not someone dodging
         internal static bool IsValidTarget(Character owner, Character target)
         {
-            if (target == owner)
+            // A creature the elements hold in the twins' arena isn't there for the staves (Bosses\TwinsStasis)
+            if (target == owner || Bosses.TwinsStasis.Held(target))
             {
                 return false;
             }

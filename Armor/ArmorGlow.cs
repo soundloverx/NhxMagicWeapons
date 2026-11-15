@@ -83,10 +83,12 @@ namespace NhxMagicWeapons.Armor
             return true;
         }
 
-        // The whole set worn and its staff in hand, as this VisEquipment shows them (ArmorCrackle too)
+        // The whole set worn and its staff in hand, as this VisEquipment shows them (ArmorCrackle too). The sets' bosses
+        // hold no staff and glow as if they did (Bosses\CallerBoss)
         internal static bool Wielding(VisEquipment equipment, int[] set, int staff)
         {
-            return equipment && staff != 0 && equipment.m_currentRightItemHash == staff && WholeSet(equipment, set);
+            return equipment && ((staff != 0 && equipment.m_currentRightItemHash == staff) || Bosses.CallerBoss.Empowered(equipment))
+                && WholeSet(equipment, set);
         }
 
         // A material slot's color that glows (black emission, as on most of the set, doesn't)
