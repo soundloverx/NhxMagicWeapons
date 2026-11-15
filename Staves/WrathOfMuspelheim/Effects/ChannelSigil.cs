@@ -97,6 +97,17 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             sigil.m_flareIn = Mathf.Max(sigil.m_flareIn, flare);
         }
 
+        // Its three rings' textures (the sun star, the runes, the flame teeth; white, tinted when drawn), also for the
+        // twins' runes (Bosses\ElementRune). Null on a dedicated server
+        internal static Texture2D[] Textures
+        {
+            get
+            {
+                Prepare();
+                return s_textures;
+            }
+        }
+
         // Its textures made ahead (as the staff is added, while the game loads), so the first sigil doesn't stall a fight
         internal static void Prepare()
         {

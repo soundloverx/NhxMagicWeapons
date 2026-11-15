@@ -69,8 +69,10 @@ namespace NhxMagicWeapons.Armor
 
         // The user's (2026-11-11), the same for both sets: each requirement's amount for crafting, then for the upgrade at
         // the table (the game asks the second for each level above 1; a 0 isn't asked or shown). Only the jute differs:
-        // blue for Stormcaller's Raiment, red for the Firecaller's Regalia
-        private static RequirementConfig[] Requirements(string piece, string jute)
+        // blue for Stormcaller's Raiment, red for the Firecaller's Regalia. And since 2026-11-15 one of its twin's drops
+        // to craft each piece (the user: "The Stormcaller set will require 1x Stormheart per item to craft and the
+        // Firecaller set will require 1x tear per item to craft, alongside existing material requirements"; Bosses\)
+        private static RequirementConfig[] Requirements(string piece, string jute, string heart)
         {
             switch (piece)
             {
@@ -82,6 +84,7 @@ namespace NhxMagicWeapons.Armor
                         new RequirementConfig("AskHide", 10, 10),
                         new RequirementConfig("CelestialFeather", 0, 2),
                         new RequirementConfig(jute, 4, 0),
+                        new RequirementConfig(heart, 1, 0),
                         new RequirementConfig(Idol, 1, 0, false),
                     };
                 case "Robe":
@@ -92,6 +95,7 @@ namespace NhxMagicWeapons.Armor
                         new RequirementConfig("FlametalNew", 10, 10),
                         new RequirementConfig("CelestialFeather", 0, 2),
                         new RequirementConfig(jute, 10, 0),
+                        new RequirementConfig(heart, 1, 0),
                         new RequirementConfig(Idol, 1, 0, false),
                     };
                 case "Greaves":
@@ -102,6 +106,7 @@ namespace NhxMagicWeapons.Armor
                         new RequirementConfig("FlametalNew", 10, 10),
                         new RequirementConfig("CelestialFeather", 0, 2),
                         new RequirementConfig(jute, 6, 0),
+                        new RequirementConfig(heart, 1, 0),
                         new RequirementConfig(Idol, 1, 0, false),
                     };
                 default: // Cloak
@@ -111,6 +116,7 @@ namespace NhxMagicWeapons.Armor
                         new RequirementConfig("FlametalNew", 10, 10),
                         new RequirementConfig("CelestialFeather", 4, 2),
                         new RequirementConfig(jute, 10, 0),
+                        new RequirementConfig(heart, 1, 0),
                         new RequirementConfig(Idol, 1, 0, false),
                     };
             }
@@ -168,6 +174,10 @@ namespace NhxMagicWeapons.Armor
             return new HitData.DamageModPair { m_type = type, m_modifier = modifier };
         }
 
+        // Each set's pieces as made here (hood, robe, greaves, cloak): the bosses wear them (Bosses\CallerBosses)
+        internal static readonly List<GameObject> StormPieces = new List<GameObject>();
+        internal static readonly List<GameObject> FirePieces = new List<GameObject>();
+
         internal static void Add()
         {
             FirecallerColors colors = FirecallerColors.Load();
@@ -183,6 +193,8 @@ namespace NhxMagicWeapons.Armor
                 }
                 GameObject storm = AddPiece(model, StormPrefix, Pieces[i], StormSet, stormBonus, null, Staves.StaffOfStorms.Staff.ItemName);
                 GameObject fire = AddPiece(model, FirePrefix, Pieces[i], FireSet, fireBonus, colors, Staves.WrathOfMuspelheim.Staff.ItemName);
+                StormPieces.Add(storm);
+                FirePieces.Add(fire);
                 if (Pieces[i] != "Cloak")
                 {
                     // The legendary looks' runes (ArmorLegend), on the Firecaller's Regalia only (the user, 2026-11-13: "Can we
@@ -340,7 +352,8 @@ namespace NhxMagicWeapons.Armor
                 CraftingStation = CraftingStations.GaldrTable,
                 RepairStation = CraftingStations.GaldrTable,
                 MinStationLevel = StationLevel,
-                Requirements = Requirements(piece, prefix == FirePrefix ? "JuteRed" : "JuteBlue"),
+                Requirements = Requirements(piece, prefix == FirePrefix ? "JuteRed" : "JuteBlue",
+                    prefix == FirePrefix ? Bosses.TwinsItems.SurtrsTearName : Bosses.TwinsItems.StormheartName),
             });
             // As the game's recipes from the Mistlands on: crafting and the table's upgrade don't take the idol (at a
             // crafting station, upgrader requirements don't count), but it's what lists the piece at the Forge of

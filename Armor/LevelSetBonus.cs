@@ -89,15 +89,17 @@ namespace NhxMagicWeapons.Armor
             {
                 return 0;
             }
-            int lowest = int.MaxValue;
-            foreach (ItemDrop.ItemData item in new[] { humanoid.m_helmetItem, humanoid.m_chestItem, humanoid.m_legItem, humanoid.m_shoulderItem })
-            {
-                if (item != null && item.m_shared.m_setName == setName)
-                {
-                    lowest = Mathf.Min(lowest, item.m_quality);
-                }
-            }
+            // Asked several times a second by each worn piece's looks (ArmorLegend.Level): no array made for it
+            int lowest = Lower(int.MaxValue, humanoid.m_helmetItem, setName);
+            lowest = Lower(lowest, humanoid.m_chestItem, setName);
+            lowest = Lower(lowest, humanoid.m_legItem, setName);
+            lowest = Lower(lowest, humanoid.m_shoulderItem, setName);
             return lowest == int.MaxValue ? 0 : lowest;
+        }
+
+        private static int Lower(int lowest, ItemDrop.ItemData item, string setName)
+        {
+            return item != null && item.m_shared.m_setName == setName ? Mathf.Min(lowest, item.m_quality) : lowest;
         }
 
         // On someone, the game's lines show the bonus as it is; in a piece's tooltip, where no one wears it, how it goes

@@ -41,6 +41,11 @@
       <HintPath>..\..\bepinex_mod_libs\0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <!-- Localization (the altar's hover text) -->
+    <Reference Include="assembly_guiutils_publicized">
+      <HintPath>..\..\publicized_assemblies\1.0-release\assembly_guiutils_publicized.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="assembly_utils_publicized">
       <HintPath>..\..\publicized_assemblies\1.0-release\assembly_utils_publicized.dll</HintPath>
       <Private>False</Private>
@@ -91,6 +96,20 @@
       <HintPath>..\..\valheim_mod_libraries\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <!-- The twins' altar as a location (Jotunn's CustomLocation has an overload taking the game's SoftReference) -->
+    <Reference Include="SoftReferenceableAssets">
+      <HintPath>$(ValheimManaged)\SoftReferenceableAssets.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <!-- Loading the twins' music from files (Bosses\TwinsMusic.cs) -->
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestAudioModule">
+      <HintPath>$(ValheimManaged)\UnityEngine.UnityWebRequestAudioModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Armor\ArmorCrackle.cs" />
@@ -104,7 +123,35 @@
     <Compile Include="Armor\StormcallerArmor.cs" />
     <Compile Include="ArmorLookCommands.cs" />
     <Compile Include="AudioRouting.cs" />
+    <Compile Include="RequirementPages.cs" />
     <Compile Include="BeamOrbitCommand.cs" />
+    <Compile Include="AltarCommand.cs" />
+    <Compile Include="BossCommand.cs" />
+    <Compile Include="Bosses\BossAttacks.cs" />
+    <Compile Include="Bosses\BossBolt.cs" />
+    <Compile Include="Bosses\BossCall.cs" />
+    <Compile Include="Bosses\BossFlames.cs" />
+    <Compile Include="Bosses\CallerBoss.cs" />
+    <Compile Include="Bosses\CallerBosses.cs" />
+    <Compile Include="Bosses\ChargeLook.cs" />
+    <Compile Include="Bosses\ElementCharge.cs" />
+    <Compile Include="Bosses\ElementRune.cs" />
+    <Compile Include="Bosses\Looks.cs" />
+    <Compile Include="Bosses\Showroom.cs" />
+    <Compile Include="Bosses\TwinsAltars.cs" />
+    <Compile Include="Bosses\TwinsItems.cs" />
+    <Compile Include="Bosses\TwinsAI.cs" />
+    <Compile Include="Bosses\TwinsBond.cs" />
+    <Compile Include="Bosses\TwinsDuel.cs" />
+    <Compile Include="Bosses\TwinsJudgment.cs" />
+    <Compile Include="Bosses\TwinsMusic.cs" />
+    <Compile Include="Bosses\TwinsPhase.cs" />
+    <Compile Include="Bosses\TwinsRules.cs" />
+    <Compile Include="Bosses\TwinsStasis.cs" />
+    <Compile Include="Bosses\TwinsStorm.cs" />
+    <Compile Include="Bosses\TwinsVoices.cs" />
+    <Compile Include="Bosses\TwinsLog.cs" />
+    <Compile Include="Bosses\EmbeddedAudio.cs" />
     <Compile Include="ItemLevelCommand.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -176,6 +223,13 @@
     <!-- What the mod uses of Magic Supremacy's asset bundle (Tools\slim_bundle.py), loaded from the DLL -->
     <EmbeddedResource Include="Assets\nhx_magic_weapons">
       <LogicalName>nhx_magic_weapons</LogicalName>
+    </EmbeddedResource>
+    <!-- The twins' music and voices (Bosses\EmbeddedAudio.cs): every track in Music\ and line in Sounds\, by file name -->
+    <EmbeddedResource Include="Music\*.ogg;Music\*.wav;Music\*.mp3">
+      <LogicalName>music/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Sounds\*.ogg;Sounds\*.wav;Sounds\*.mp3">
+      <LogicalName>sounds/%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

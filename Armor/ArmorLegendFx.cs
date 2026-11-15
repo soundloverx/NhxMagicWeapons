@@ -53,6 +53,14 @@ namespace NhxMagicWeapons.Armor
         private const float ShardBobPeriod = 2f;
         private const float ShardSpinSpeed = 90f;
         private const float ShardSize = 0.09f;
+        // The Stormcaller boss's second phase (Bosses\TwinsPhase; the user, 2026-11-15, of Claude's pick with "the shards
+        // as its look": "go with your pick"): its shards, already there at level 20, grow over RageGrow seconds to this
+        // many times wider an orbit, faster, bigger, and arc this much more often
+        private const float RageGrow = 2f;
+        private const float RageRadius = 0.8f;
+        private const float RageSpeed = 2f;
+        private const float RageSize = 1.2f;
+        private const float RageArcs = 0.7f;
         // An arc between two shards (or one and the robe's crystal) every so often, this long
         private const float ArcMin = 0.35f;
         private const float ArcMax = 0.9f;
@@ -130,6 +138,10 @@ namespace NhxMagicWeapons.Armor
         private bool m_signature;
         private float m_arcTimer;
         private float m_orbit;
+        // The wearer's size (Build)
+        private float m_size = 1f;
+        // How far into a boss's second phase its shards are (0 to 1)
+        private float m_rage;
 
         private void Awake()
         {
@@ -228,15 +240,20 @@ namespace NhxMagicWeapons.Armor
             }
             if (m_shards != null && m_signature && m_bones.TryGetValue("Spine2", out Transform chest))
             {
-                m_orbit += ShardOrbitSpeed * Time.deltaTime;
-                Vector3 center = chest.position + Vector3.up * ShardHeight;
+                m_rage = Mathf.MoveTowards(m_rage, Bosses.TwinsPhase.IsEnraged(m_wearer) ? 1f : 0f, Time.deltaTime / RageGrow);
+                float rage = Mathf.SmoothStep(0f, 1f, m_rage);
+                m_orbit += ShardOrbitSpeed * (1f + RageSpeed * rage) * Time.deltaTime;
+                Vector3 center = chest.position + Vector3.up * ShardHeight * m_size;
+                float radius = ShardRadius * (1f + RageRadius * rage);
+                Vector3 grown = Vector3.one * (1f + RageSize * rage);
                 for (int i = 0; i < m_shards.Length; i++)
                 {
                     float angle = m_orbit + 360f * i / m_shards.Length;
                     float bob = ShardBob * Mathf.Sin(2f * Mathf.PI * (Time.time / ShardBobPeriod + (float)i / m_shards.Length));
                     // Round the world's up, so that turning doesn't swing them
                     Vector3 outward = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.forward;
-                    m_shards[i].position = center + outward * ShardRadius + Vector3.up * bob;
+                    m_shards[i].localScale = grown;
+                    m_shards[i].position = center + (outward * radius + Vector3.up * bob) * m_size;
                     // Upright (the staff's crystal runs along its mesh's z), turning about it
                     m_shards[i].rotation = Quaternion.AngleAxis(Time.time * ShardSpinSpeed + 120f * i, Vector3.up) * Quaternion.Euler(-90f, 0f, 0f);
                 }
@@ -298,11 +315,15 @@ namespace NhxMagicWeapons.Armor
                     m_bones[bone.name] = bone;
                 }
             }
+            // At the wearer's size: a player's 1, the sets' bosses' 2 (Bosses\CallerBosses), whose bodies are bigger all
+            // round, so their particles, the eyes' flames and the shards too (the particles scale with their hierarchy:
+            // StaffEffects.CopyParticles), and the shards' orbit and the spots' offsets (LateUpdate, AddEmitter)
+            m_size = Mathf.Max(0.01f, m_wearer.transform.localScale.y);
             GameObject root = new GameObject("nhx_legend");
             root.layer = gameObject.layer;
             root.transform.SetParent(transform, false);
             Vector3 scale = transform.lossyScale;
-            root.transform.localScale = new Vector3(1f / scale.x, 1f / scale.y, 1f / scale.z);
+            root.transform.localScale = new Vector3(m_size / scale.x, m_size / scale.y, m_size / scale.z);
             m_root = root.transform;
 
             if (m_storm)
@@ -340,7 +361,9 @@ namespace NhxMagicWeapons.Armor
                 }
                 return;
             }
-            Emitter emitter = new Emitter { m_particles = particles, m_bone = bone, m_offset = spot.m_offset, m_inBone = inBone, m_rate = spot.m_rate, m_perMeter = spot.m_perMeter };
+            // An offset in the bone's space grows with the bone; one in the wearer's frame, by the wearer's size
+            Vector3 offset = inBone ? spot.m_offset : spot.m_offset * m_size;
+            Emitter emitter = new Emitter { m_particles = particles, m_bone = bone, m_offset = offset, m_inBone = inBone, m_rate = spot.m_rate, m_perMeter = spot.m_perMeter };
             SetRate(emitter, 0f);
             m_particles.Add(emitter);
         }
@@ -544,7 +567,7 @@ namespace NhxMagicWeapons.Armor
             {
                 return;
             }
-            m_arcTimer = Random.Range(ArcMin, ArcMax);
+            m_arcTimer = Random.Range(ArcMin, ArcMax) * (1f - RageArcs * m_rage);
             int from = Random.Range(0, m_shards.Length);
             LightningAnchor start = new LightningAnchor { m_transform = m_shards[from] };
             // The crystal's renderer sits at the body's root, skinned onto the bones: its bounds' center is where it shows
@@ -575,6 +598,7 @@ namespace NhxMagicWeapons.Armor
                 }
             }
             GameObject embers = Instantiate(s_stepTemplate, point + Vector3.up * 0.03f, Quaternion.LookRotation(Vector3.up));
+            embers.transform.localScale = Vector3.one * fx.m_size;
             embers.SetActive(true);
             Destroy(embers, 2.5f);
         }

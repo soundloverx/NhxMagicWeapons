@@ -56,13 +56,32 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
                 FlameLook.SetReach(Instantiate(flames, origin, Quaternion.LookRotation(dir)), reach);
             }
 
+            if (Burn(owner, hitData, origin, dir, reach, m_width, m_angle, out Vector3 farthest))
+            {
+                StaffHits.OnCharacterHit(owner, hitData, m_adrenaline);
+                BaseAI.DoProjectileHitNoise(farthest, hitNoise, owner);
+            }
+
+            Destroy(gameObject);
+        }
+
+        public string GetTooltipString(int itemQuality)
+        {
+            return "";
+        }
+
+        // Burns everything in the cone from `origin` along `dir` (`width` meters around its line there, `angle` degrees
+        // wider on each side farther out, up to `reach`) that the caster may hit and that isn't behind something solid.
+        // Whether it burnt a character, and the farthest point it did. Also the Firecaller boss's flames (Bosses\BossFlames)
+        internal static bool Burn(Character owner, HitData hitData, Vector3 origin, Vector3 dir, float reach, float width, float angle, out Vector3 farthest)
+        {
             bool hitCharacter = false;
-            Vector3 farthest = origin;
+            farthest = origin;
             HashSet<GameObject> done = new HashSet<GameObject>();
-            foreach (Collider collider in Physics.OverlapSphere(origin, reach + m_width, StaffHits.RayMask))
+            foreach (Collider collider in Physics.OverlapSphere(origin, reach + width, StaffHits.RayMask))
             {
                 GameObject target = Projectile.FindHitObject(collider);
-                if (!target || done.Contains(target) || !InCone(collider, origin, dir, reach, out Vector3 point))
+                if (!target || done.Contains(target) || !InCone(collider, origin, dir, reach, width, angle, out Vector3 point))
                 {
                     continue;
                 }
@@ -78,22 +97,11 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
                     farthest = Vector3.Dot(point - origin, dir) > Vector3.Dot(farthest - origin, dir) ? point : farthest;
                 }
             }
-            if (hitCharacter)
-            {
-                StaffHits.OnCharacterHit(owner, hitData, m_adrenaline);
-                BaseAI.DoProjectileHitNoise(farthest, hitNoise, owner);
-            }
-
-            Destroy(gameObject);
-        }
-
-        public string GetTooltipString(int itemQuality)
-        {
-            return "";
+            return hitCharacter;
         }
 
         // Whether some of the collider is in the cone and can be seen from its start, and its point nearest the cone's line
-        private bool InCone(Collider collider, Vector3 origin, Vector3 dir, float reach, out Vector3 point)
+        private static bool InCone(Collider collider, Vector3 origin, Vector3 dir, float reach, float width, float angle, out Vector3 point)
         {
             Vector3 center = collider.bounds.center;
             float along = Mathf.Clamp(Vector3.Dot(center - origin, dir), 0f, reach);
@@ -104,7 +112,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
                 return false;
             }
             float off = Vector3.Distance(point, origin + dir * along);
-            if (off > m_width + along * Mathf.Tan(m_angle * Mathf.Deg2Rad))
+            if (off > width + along * Mathf.Tan(angle * Mathf.Deg2Rad))
             {
                 return false;
             }

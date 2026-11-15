@@ -166,6 +166,16 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
 
         // How the staff's lightning is drawn, for the Stormcaller's Raiment's crackle (ArmorCrackle)
         internal static LightningLook Look { get; private set; }
+        // The strike's effect from the sky and the crackle (networked), and the strike's reach around where it lands: the
+        // Stormcaller boss's too (Bosses\ElementRune)
+        internal static GameObject Strike { get; private set; }
+        internal static GameObject Crackle { get; private set; }
+        // The storm's lighter bolts and its cloud's material: the Stormcaller boss's storm too (Bosses\TwinsStorm)
+        internal static GameObject RainBolt { get; private set; }
+        internal static Material CloudMaterial { get; private set; }
+        // The staff's icon: Static's (Bosses\ElementCharge)
+        internal static Sprite Icon { get; private set; }
+        internal const float StrikeArea = StrikeRadius;
 
         internal static void Add()
         {
@@ -185,8 +195,11 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             GameObject crackle = StaffEffects.AddWithoutParticles(CrackleName, CracklePrefab);
             GameObject impact = StaffEffects.AddWithoutParticles(ImpactName, ImpactPrefab);
             GameObject strike = AddStrike(look, StrikeName, StrikeHeight, 1f, 30f);
+            Strike = strike;
+            Crackle = crackle;
             GameObject eyeStrike = AddStrike(look, EyeStrikeName, StormHeight, StormShake, StormShakeRange);
             GameObject rainBolt = AddRainBolt(look);
+            RainBolt = rainBolt;
             // The storm's first bolt each second is one bolt too: the rain spreads them out
             StrikeLightning eyeLightning = eyeStrike ? eyeStrike.GetComponent<StrikeLightning>() : null;
             if (eyeLightning)
@@ -205,6 +218,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             SetUpModel(staff);
 
             ItemDrop.ItemData.SharedData shared = staff.GetComponent<ItemDrop>().m_itemData.m_shared;
+            Icon = shared.m_icons != null && shared.m_icons.Length > 0 ? shared.m_icons[0] : null;
             ItemDrop.ItemData.SharedData baseShared = embers.GetComponent<ItemDrop>().m_itemData.m_shared;
             shared.m_name = NameKey;
             shared.m_description = "$item_nhx_staffstorms_description";
@@ -451,6 +465,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
             eye.m_height = StormHeight;
             eye.m_tickTimeout = StormInterval * 1.6f;
             eye.m_cloudMaterial = LineMaterials.Copy(CloudEffect, CloudChild);
+            CloudMaterial = eye.m_cloudMaterial;
             PrefabManager.Instance.AddPrefab(go);
             return go;
         }
