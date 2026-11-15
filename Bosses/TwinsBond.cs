@@ -13,6 +13,9 @@ namespace NhxMagicWeapons.Bosses
     // the players around, and when the window is out, raises its twin there at half its health (Raise). Fall within the
     // window, and nothing is raised: the fight is won (Won: the Stormhearts and Surtr's Tears). The window is RaiseDelay,
     // or SoloDelay with one player in the fight (TwinsAI.InReach).
+    // While its twin is down, the survivor fights alone (Alone; the fight's redesign, agreed with the user 2026-11-15, its
+    // change 7): it enters its second phase at once, whatever its health (Fell: TwinsPhase.TwinFell), hunts whoever can
+    // hurt it (TwinsAI), and its fallen twin's element is silent on the players (TwinsDuel.Silence).
     // Summoned together (Summon: an altar's offering, or nhx_boss summon), they're linked, and an altar's twins know its
     // arena (Arena: TwinsJudgment, TwinsRules). Twins spawned one by one (devcommands' spawn) aren't linked: they fight,
     // but alone, and drop nothing
@@ -114,6 +117,23 @@ namespace NhxMagicWeapons.Bosses
             ZDO zdo = boss && boss.m_nview && boss.m_nview.IsValid() ? boss.m_nview.GetZDO() : null;
             ZDOID twin = zdo != null ? zdo.GetZDOID(s_twinKey) : ZDOID.None;
             return twin.IsNone() ? null : ZDOMan.instance.GetZDO(twin);
+        }
+
+        // Whether this twin fights alone (on any game, from its ZDO): its twin fallen, to be raised when its countdown is
+        // out; or with no twin at all (spawned alone), and no living one of the other element about
+        internal static bool Alone(CallerBoss boss)
+        {
+            ZDO zdo = boss && boss.m_nview && boss.m_nview.IsValid() ? boss.m_nview.GetZDO() : null;
+            if (zdo == null)
+            {
+                return false;
+            }
+            if (zdo.GetLong(s_raiseAtKey) != 0L)
+            {
+                return true;
+            }
+            return zdo.GetZDOID(s_twinKey).IsNone()
+                && float.IsInfinity(CallerBoss.NearestLiving(boss.transform.position, TwinsDuel.Other(boss.Element), out _));
         }
 
         private static void SetArena(CallerBoss boss, Vector3 arena)
@@ -236,6 +256,11 @@ namespace NhxMagicWeapons.Bosses
             Tell(boss.transform.position, fallen == Element.Storm ? "$msg_nhx_twin_fell_storm" : "$msg_nhx_twin_fell_fire");
             TwinsLog.Event($"{name} will raise its twin at {TwinsLog.At(ground)} in {delay:0} s ({players} player(s) in the fight); its rune {(rune ? "placed" : "missing")}.");
             TwinsVoices.Say(fallen == Element.Storm ? TwinsVoices.BlueBusy : TwinsVoices.RedBusy, ground, (fallen == Element.Storm ? "the Stormcaller" : "the Firecaller") + " fell");
+            // Alone, it enters its second phase at once (its line after the fallen twin's: said after it, it waits)
+            if (boss.m_phase)
+            {
+                boss.m_phase.TwinFell();
+            }
         }
 
         // The fallen twin back, at half its health, where it fell, linked to this one

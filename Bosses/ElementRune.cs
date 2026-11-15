@@ -51,8 +51,8 @@ namespace NhxMagicWeapons.Bosses
         private const float SpinUp = 2f;
         // Its colors (the shader draws twice this), a pulse quickening from PulseFrom to PulseTo a second, PulseDepth deep,
         // the flash as it strikes, and how long it takes to fade after
-        private static readonly Color Storm = new Color(0.35f, 0.55f, 1f);
-        private static readonly Color Fire = new Color(1f, 0.42f, 0.09f);
+        internal static readonly Color Storm = new Color(0.35f, 0.55f, 1f);
+        internal static readonly Color Fire = new Color(1f, 0.42f, 0.09f);
         private const float PulseFrom = 1.5f;
         private const float PulseTo = 7f;
         private const float PulseDepth = 0.35f;

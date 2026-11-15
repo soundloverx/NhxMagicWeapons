@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.1.0
+- A staff can no longer hurt its own caller: the Staff of Storms does nothing to the Stormcaller, nor the Wrath of Muspelheim to the Firecaller, whose ward flashes where it's struck. The twin hunting you is the one you can't hurt, so a staff swap is a target swap. It stops what you aim through it, and chains, tendrils, the Eye of the Storm and the Regalia's thread no longer pick it
+- While a twin is down, its element is silent: its charge goes and builds no more, no overload comes of it, and drawing its staff gets no answer. If the twin rises, its charge builds again from none
+- A twin left alone enters its second phase at once, hunts whoever holds its fallen twin's staff, and keeps casting its second-phase spell, at its own quarry when it faces one player
+
 ## v2.0.0
 - Added the Stormcaller and the Firecaller, twin bosses called at their altars in the Ashlands by offering a Lodestone of the Elements (made at the Galdr Table; used from the inventory, it pins the nearest altar on the map). Beaten together, they drop 4 Stormhearts and 4 Surtr's Tears
 - Each piece of Stormcaller's Raiment now needs a Stormheart to craft, and each piece of the Firecaller's Regalia a Surtr's Tear

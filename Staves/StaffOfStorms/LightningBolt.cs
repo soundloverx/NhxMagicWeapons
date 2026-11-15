@@ -184,6 +184,11 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         // Stored for every game to draw
         private void Chain(Character owner, Character struck, HitData hitData, int level, bool roll = true)
         {
+            // Nothing chains from a twin the staff can't hurt (Bosses\TwinsRules.Immune): it shields its twin
+            if (Bosses.TwinsRules.Immune(owner, struck))
+            {
+                return;
+            }
             if (roll && Random.value > ChainChance(level))
             {
                 return;
@@ -240,7 +245,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
                     {
                         continue;
                     }
-                    if (!StaffHits.IsValidTarget(owner, candidate) || !StaffHits.InSight(center, point))
+                    if (!StaffHits.Seeks(owner, candidate) || !StaffHits.InSight(center, point))
                     {
                         continue;
                     }

@@ -151,6 +151,7 @@
     <Compile Include="Bosses\TwinsStasis.cs" />
     <Compile Include="Bosses\TwinsStorm.cs" />
     <Compile Include="Bosses\TwinsVoices.cs" />
+    <Compile Include="Bosses\WardFlash.cs" />
     <Compile Include="Bosses\TwinsLog.cs" />
     <Compile Include="Bosses\EmbeddedAudio.cs" />
     <Compile Include="ItemLevelCommand.cs" />

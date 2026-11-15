@@ -18,6 +18,14 @@ namespace NhxMagicWeapons.Bosses
     //   happens (LeftBehind, from CallerBoss.Awake). At first that was only the owner's half-second check, which found
     //   the player back already (a portal by the arena) and let the fight go on; the user, 2026-11-15: "they should
     //   despawn if possible, before any other abilities are used or anything else - no voice lines, nothing"
+    // And of the fight's redesign (agreed with the user, 2026-11-15, its change 1):
+    // - A staff cannot hurt its own caller: a hit from a player holding the Staff of Storms on the Stormcaller, or the
+    //   Wrath of Muspelheim on the Firecaller, is refused whole (StavesOnly), so a staff swap is a target swap: the twin
+    //   chasing a player is the one they can't hurt. By the staff in hand, not the damage's type: the staves are mixed
+    //   (the Staff of Storms has spirit from level 5 and fire from 10, two fifths of the Wrath's hit is pierce), and by
+    //   type it leaked. The twin's ward flashes where it was struck (CallerBoss.Ward: a refused hit shows no number).
+    //   What's aimed at it still ends on it (it shields its twin); the staves' spells that pick their own targets leave
+    //   it alone (Immune, asked by Staves\StaffHits.Seeks)
     internal static class TwinsRules
     {
         private const float Abandon = 30f;
@@ -85,16 +93,24 @@ namespace NhxMagicWeapons.Bosses
             ZNetScene.instance.Destroy(boss.gameObject);
         }
 
-        // Whether this player holds one of the two staves, as every game sees it
-        private static bool WieldsStaff(Player player)
+        // The element of the staff this player holds, as every game sees it (none: anything else in hand, or nothing)
+        internal static Element StaffOf(Player player)
         {
             if (s_stormHash == 0)
             {
                 s_stormHash = Storms.ItemName.GetStableHashCode();
                 s_wrathHash = Wrath.ItemName.GetStableHashCode();
             }
-            VisEquipment equipment = player.m_visEquipment;
-            return equipment && (equipment.m_currentRightItemHash == s_stormHash || equipment.m_currentRightItemHash == s_wrathHash);
+            VisEquipment equipment = player ? player.m_visEquipment : null;
+            int hash = equipment ? equipment.m_currentRightItemHash : 0;
+            return hash == s_stormHash ? Element.Storm : hash == s_wrathHash ? Element.Fire : Element.None;
+        }
+
+        // Whether `target` is a twin that `attacker` can't hurt with the staff in their hand: its own element's
+        internal static bool Immune(Character attacker, Character target)
+        {
+            CallerBoss twin = CallerBoss.Of(target);
+            return twin && attacker is Player player && StaffOf(player) == twin.Element;
         }
 
         // A twin's hits, on its owner's game, before anything is taken. An altar's twins only take them from inside its
@@ -108,14 +124,16 @@ namespace NhxMagicWeapons.Bosses
                 {
                     return true;
                 }
-                if (!(hit.GetAttacker() is Player player) || !WieldsStaff(player))
+                Player player = hit.GetAttacker() as Player;
+                Element staff = StaffOf(player);
+                if (staff == Element.None)
                 {
                     TwinsLog.Refuse(__instance, hit.GetAttacker() is Player ? "not holding a staff" : "not from a player");
                     return false;
                 }
                 // Pierce counts only as the Wrath of Muspelheim's, part of its fire (CallerBosses: the twins take only fire
                 // and lightning)
-                if (player.m_visEquipment.m_currentRightItemHash != s_wrathHash)
+                if (staff != Element.Fire)
                 {
                     hit.m_damage.m_pierce = 0f;
                 }
@@ -129,6 +147,14 @@ namespace NhxMagicWeapons.Bosses
                 if (TwinsBond.Arena(twin, out Vector3 arena) && Utils.DistanceXZ(player.transform.position, arena) > TwinsAltars.ArenaRadius + ArenaGrace)
                 {
                     TwinsLog.Refuse(__instance, "from outside the ring");
+                    return false;
+                }
+                // Its own element's staff: refused whole, before the game takes anything of it (no sliver of the other
+                // types, no burning, no stagger), and its ward shows
+                if (twin && staff == twin.Element)
+                {
+                    TwinsLog.Refuse(__instance, "its own element's staff");
+                    twin.Ward(hit.m_point, player);
                     return false;
                 }
                 return true;

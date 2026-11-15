@@ -17,13 +17,14 @@ namespace NhxMagicWeapons.Bosses
     //   sideway_speed, in m/s), and its legs are twice as long, so at twice a player's speed the animations are given
     //   the player's (StrideScale), and its feet stay on the ground
     // And on the game that runs it (its owner): its part in the twins' fight (TwinsAI picks its role and target every
-    // RoleInterval), its answer to a player drawing its staff (RPC_Punish: TwinsDuel), and its bond with its twin
-    // (TwinsBond: raising it if it falls)
+    // RoleInterval), its answer to a player drawing its staff (RPC_Punish: TwinsDuel), its bond with its twin
+    // (TwinsBond: raising it if it falls), and its ward against its own element's staff (Ward: TwinsRules)
     internal class CallerBoss : MonoBehaviour
     {
         internal const int DefaultLevel = 20;
         internal static readonly int LevelKey = "nhx_boss_level".GetStableHashCode();
         internal const string PunishRpc = "NhxTwinsPunish";
+        private const string WardRpc = "NhxTwinsWard";
 
         // Its element (Element: the staff whose drawing it answers)
         public int m_element;
@@ -55,6 +56,11 @@ namespace NhxMagicWeapons.Bosses
         // Where a chasing Stormcaller lands: well within its bolt's reach, not at arm's length (a caster; the Firecaller, and
         // both when punishing a swap, land at ArriveGap)
         private const float StormChaseGap = 12f;
+        // Its ward shows at most this often (seconds), and for a hit through its middle (a blast, Lightning Step, the
+        // comet: nearer its axis than WardNear), this far from it toward whoever struck (meters)
+        private const float WardEvery = 0.15f;
+        private const float WardNear = 0.3f;
+        private const float WardReach = 1f;
 
         // Every boss on this game (BossCommand and the fight look for them here)
         internal static readonly List<CallerBoss> All = new List<CallerBoss>();
@@ -89,6 +95,7 @@ namespace NhxMagicWeapons.Bosses
         private float m_roleTimer;
         private float m_outOfReach;
         private float m_nextRush;
+        private float m_lastWard = -WardEvery;
 
         internal Element Element => (Element)m_element;
 
@@ -160,6 +167,7 @@ namespace NhxMagicWeapons.Bosses
             if (m_nview)
             {
                 m_nview.Register<ZDOID>(PunishRpc, RPC_Punish);
+                m_nview.Register<Vector3>(WardRpc, RPC_Ward);
                 TwinsBond.Register(this);
             }
         }
@@ -299,6 +307,35 @@ namespace NhxMagicWeapons.Bosses
             Rush(player, ArriveGap);
             m_nextRush = Time.time + RushCooldown;
             m_roleTimer = 0f;
+        }
+
+        // Its own element's staff struck it at `point`, to nothing (TwinsRules.StavesOnly, on its owner's game): its ward
+        // flashes there on every game (WardFlash), so whoever struck sees why no number came
+        internal void Ward(Vector3 point, Character attacker)
+        {
+            if (Time.time - m_lastWard < WardEvery || !m_nview || !m_nview.IsValid() || !m_humanoid)
+            {
+                return;
+            }
+            m_lastWard = Time.time;
+            Vector3 center = m_humanoid.GetCenterPoint();
+            Vector3 flat = point - center;
+            flat.y = 0f;
+            if (flat.sqrMagnitude < WardNear * WardNear && attacker)
+            {
+                flat = attacker.GetCenterPoint() - center;
+                flat.y = 0f;
+                if (flat.sqrMagnitude > 0.01f)
+                {
+                    point = center + flat.normalized * WardReach;
+                }
+            }
+            m_nview.InvokeRPC(ZNetView.Everybody, WardRpc, point);
+        }
+
+        private void RPC_Ward(long sender, Vector3 point)
+        {
+            WardFlash.Show(this, point);
         }
 
         // In a flash to `gap` short of `target`, along the ground (LightningStep.Walk), drawn as its element's

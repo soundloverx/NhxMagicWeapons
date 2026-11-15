@@ -149,6 +149,14 @@ namespace NhxMagicWeapons.Staves
             return true;
         }
 
+        // Whether a spell that picks its own targets may pick `target` (a chain's jumps, the Wrath's tendrils, the Eye of
+        // the Storm's bolts): a valid target, and not a twin the caster's staff can't hurt (Bosses\TwinsRules.Immune: its
+        // own element's). Only what's aimed at such a twin, or bursts beside it, strikes it, to nothing
+        internal static bool Seeks(Character owner, Character target)
+        {
+            return !Bosses.TwinsRules.Immune(owner, target) && IsValidTarget(owner, target);
+        }
+
         // Deals the attack's hit (damage already scaled by the caster's skill, push, status effect...) to what `collider`
         // belongs to. Building pieces take it too, as from the game's projectiles (their own resistances apply: iron and
         // black marble shrug off lightning). Returns whether it hit something, and the character if that's what it was.

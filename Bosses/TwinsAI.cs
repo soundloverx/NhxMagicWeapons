@@ -13,6 +13,10 @@ namespace NhxMagicWeapons.Bosses
     // - Nobody holds its staff, one player: a watcher (the user: "Yes, I like the watcher"): it keeps back, casting only its
     //   telegraphed spell (BossAttacks.IsWatcherSpell) and half again as rarely; between spells it stands and watches its
     //   player (no wandering about: IdleMovement)
+    // - Its twin fallen (TwinsBond.Alone): always a hunter, of whoever drew the fallen twin's staff last, the player who
+    //   can hurt it (a staff cannot hurt its own caller: TwinsRules); with no such player, of who drew its own, or the
+    //   nearest. The fight's redesign, agreed with the user 2026-11-15: alone with one player, the only staff that hurts
+    //   the survivor is the fallen twin's, so by the rules above it would have stood and watched to the end
     // Its AI goes after that target (UpdateTarget); the attacks, moves and the rest are the game's
     internal static class TwinsAI
     {
@@ -62,7 +66,13 @@ namespace NhxMagicWeapons.Bosses
             else if (s_fighters.Count > 0)
             {
                 Player mine = LatestDrawer(boss.Element);
-                if (mine)
+                if (TwinsBond.Alone(boss))
+                {
+                    Player bane = LatestDrawer(TwinsDuel.Other(boss.Element));
+                    role = CallerBoss.Role.Hunter;
+                    target = bane ? bane : mine ? mine : Nearest(boss);
+                }
+                else if (mine)
                 {
                     role = CallerBoss.Role.Hunter;
                     target = mine;
@@ -143,6 +153,23 @@ namespace NhxMagicWeapons.Bosses
                 }
             }
             return latest;
+        }
+
+        // Among s_fighters, the nearest to this twin
+        private static Player Nearest(CallerBoss boss)
+        {
+            Player nearest = null;
+            float best = float.PositiveInfinity;
+            foreach (Player player in s_fighters)
+            {
+                float distance = Vector3.Distance(player.transform.position, boss.transform.position);
+                if (distance < best)
+                {
+                    best = distance;
+                    nearest = player;
+                }
+            }
+            return nearest;
         }
 
         // In its second phase (TwinsPhase), where a watcher casts its phase's spell in place of its own

@@ -265,7 +265,7 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
                 Vector3 offset = character.transform.position - m_center;
                 offset.y = 0f;
                 float distance = offset.sqrMagnitude;
-                if (distance <= bestDistance && StaffHits.IsValidTarget(m_owner, character))
+                if (distance <= bestDistance && StaffHits.Seeks(m_owner, character))
                 {
                     best = character;
                     bestDistance = distance;

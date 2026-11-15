@@ -40,6 +40,12 @@ namespace NhxMagicWeapons.Bosses
     //   on one staff by swapping away and straight back; the user's rule then: "when swapping the staff, set the previous
     //   staff's stack at 4 (from any value it was at, either 1 or > 5) and keep it at 4 until the current stack reaches 4"
     //   (it slowing nothing while held is Claude's pick: otherwise eitr or stamina would be slowed most of the fight)
+    // - A fallen twin's element is silent while its twin fights on alone (Silence; the fight's redesign, agreed with the
+    //   user 2026-11-15, its change 7: "While a twin is down, its element does nothing to players, so the last window is
+    //   one staff, one target and the raise countdown"): its charge goes and builds no more, so no overload comes of it
+    //   (until then its smites went on coming "from the elements"), and drawing its staff, the only one that hurts the
+    //   survivor (TwinsRules: a staff cannot hurt its own caller), gets no answer. If the twin rises, its charge builds
+    //   again from none. The survivor's own element is as ever
     internal static class TwinsDuel
     {
         internal const float EngageRadius = 50f;
@@ -75,6 +81,8 @@ namespace NhxMagicWeapons.Bosses
 
         private static bool s_inFight;
         private static Element s_drawn;
+        // The element whose twin has fallen, if one has: silent (Silence)
+        private static Element s_silent;
         private static float s_stackTimer;
         // Overloads since the last swap
         private static int s_overloads;
@@ -164,6 +172,7 @@ namespace NhxMagicWeapons.Bosses
                     return;
                 }
                 s_inFight = true;
+                s_silent = Element.None;
                 SetDrawn(player, Element.None);
                 StartStats(player);
                 TwinsLog.Event($"{TwinsLog.Name(player)} joins the fight ({nearest:0} m from the nearest twin{(inRing ? ", inside the ring" : "")}).");
@@ -185,12 +194,14 @@ namespace NhxMagicWeapons.Bosses
             {
                 TwinsPhase.UpdatePlayer(player, dt);
             }
+            // A fallen twin's element goes silent, and builds nothing
+            Silence(player);
             Element held = ElementOf(player.m_rightItem);
             if (held != Element.None && held != s_drawn)
             {
                 Draw(player, held);
             }
-            if (s_drawn != Element.None)
+            if (s_drawn != Element.None && s_drawn != s_silent)
             {
                 s_stackTimer -= dt;
                 if (s_stackTimer <= 0f)
@@ -216,6 +227,47 @@ namespace NhxMagicWeapons.Bosses
             return false;
         }
 
+        // Whether `element` is silent: its twin fallen (or never there), the other's fighting on alone (TwinsBond.Alone,
+        // from the survivor's ZDO: a twin only not loaded on this game isn't a fallen one)
+        private static bool Silent(Player player, Element element)
+        {
+            CallerBoss.NearestLiving(player.transform.position, Other(element), out CallerBoss survivor);
+            return survivor && TwinsBond.Alone(survivor);
+        }
+
+        // Every frame of the fight: the fallen twin's element going silent (its charge goes, in hand or held), and
+        // sounding again as the twin rises (its staff in hand, its charge builds again from none)
+        private static void Silence(Player player)
+        {
+            Element silent = Silent(player, Element.Storm) ? Element.Storm : Silent(player, Element.Fire) ? Element.Fire : Element.None;
+            if (silent == s_silent)
+            {
+                return;
+            }
+            Element was = s_silent;
+            s_silent = silent;
+            if (was != Element.None)
+            {
+                TwinsLog.Event($"{TwinsLog.Name(player)}: {ChargeName(was)} is silent no more (its twin is back){(s_drawn == was ? ": it builds again from none" : "")}.");
+            }
+            if (silent != Element.None)
+            {
+                ElementCharge charge = Charge(player, silent);
+                TwinsLog.Event($"{TwinsLog.Name(player)}: {ChargeName(silent)} goes silent (its twin has fallen): "
+                    + $"{(charge ? $"{charge.Stacks} {(charge.Held ? "held" : "in hand")} -> gone" : "none on them")}, and it builds no more.");
+                Clear(player, silent);
+            }
+            if (s_drawn != Element.None && (s_drawn == was || s_drawn == silent))
+            {
+                s_stackTimer = StackInterval;
+                s_overloads = 0;
+                if (s_drawn == silent)
+                {
+                    SetStacks(player, 0);
+                }
+            }
+        }
+
         private static void Draw(Player player, Element held)
         {
             Element old = s_drawn;
@@ -230,7 +282,8 @@ namespace NhxMagicWeapons.Bosses
             }
             // A swap: the new staff's charge, if it was held, builds on from where it is (a swap straight back gains
             // nothing); the old one is held until the new one reaches HeldStacks, or goes at once if it already has. The
-            // overloads' growth goes (not their SmiteWeakness, which runs out on its own), and the new staff's twin answers
+            // overloads' growth goes (not their SmiteWeakness, which runs out on its own), and the new staff's twin answers.
+            // A silent element (its twin fallen: Silence) has no charge to take up or to hold, and no twin to answer
             ElementCharge leaving = Charge(player, old);
             int was = leaving ? leaving.Stacks : 0;
             ElementCharge taken = Charge(player, held);
@@ -244,7 +297,7 @@ namespace NhxMagicWeapons.Bosses
             {
                 Clear(player, old);
             }
-            else
+            else if (old != s_silent)
             {
                 Hold(player, old);
             }
@@ -256,8 +309,8 @@ namespace NhxMagicWeapons.Bosses
             }
             CallerBoss.NearestLiving(player.transform.position, held, out CallerBoss twin);
             TwinsLog.Event($"{TwinsLog.Name(player)} swaps to the {StaffName(held)} after {heldFor:0} s on the {StaffName(old)}: "
-                + $"{ChargeName(old)} {was} -> {(takenOver ? "gone" : $"held at {HeldStacks}")}, "
-                + $"{ChargeName(held)} {(taken ? $"taken up again at {taken.Stacks}" : "starts from none")}; "
+                + $"{ChargeName(old)} {was} -> {(takenOver ? "gone" : old == s_silent ? "silent" : $"held at {HeldStacks}")}, "
+                + $"{ChargeName(held)} {(held == s_silent ? "silent (its twin has fallen)" : taken ? $"taken up again at {taken.Stacks}" : "starts from none")}; "
                 + $"{(twin ? "the " + TwinsLog.Name(twin) + " answers" : "no living twin of it to answer")}. Now: {Describe(player, true)}.");
             if (twin)
             {
@@ -275,7 +328,7 @@ namespace NhxMagicWeapons.Bosses
             return element == Element.Storm ? "Static" : "Scorch";
         }
 
-        private static Element Other(Element element)
+        internal static Element Other(Element element)
         {
             return element == Element.Storm ? Element.Fire : Element.Storm;
         }
@@ -474,6 +527,7 @@ namespace NhxMagicWeapons.Bosses
             TwinsLog.Event($"{(player ? TwinsLog.Name(player) : s_playerName)} leaves the fight{(player && player.IsDead() ? " (dead)" : "")}.");
             Summarize();
             s_inFight = false;
+            s_silent = Element.None;
             s_overloads = 0;
             TwinsJudgment.Reset(player);
             if (player && player.m_nview && player.m_nview.IsValid())

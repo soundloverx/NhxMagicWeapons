@@ -19,7 +19,8 @@ namespace NhxMagicWeapons.Bosses
     // - Damage dealt outside a hit (burning, the arcs between players, the burning way, judgment), added up by target
     //   and cause over FlushEvery seconds
     // - Events: summons, roles and targets, voice lines (said, heard, played, dropped), deaths, raises, wins, vanishing,
-    //   the second phase and its spells, creatures held, draws and swaps, overloads, judgment, rushes
+    //   the second phase and its spells, creatures held, draws and swaps, overloads, judgment, rushes, a fallen twin's
+    //   element going silent and sounding again
     // - The staves' duel (TwinsDuel; the user, 2026-11-15: "when players swap staves, the number of stacks, the hits they
     //   take and deliver, the vulnerability debuffs"): every stack with both charges (in hand or held) and the regen
     //   left, every swap with how long the old staff was out and what became of both charges, Stormstruck and

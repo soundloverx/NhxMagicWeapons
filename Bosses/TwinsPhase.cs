@@ -26,6 +26,9 @@ namespace NhxMagicWeapons.Bosses
     //   beyond, hitting whoever is on the way, and the way burns for TrailTime, hurting whoever stands in it
     // - Alone with one player, the twin that watches (TwinsAI) casts its phase's spell at them in place of its own; the
     //   hunter, with no one else, has no one to cast it at. No faster: their speeds and other attacks are as before.
+    // - Its twin fallen (the fight's redesign, agreed with the user 2026-11-15, its change 7): its second phase comes at
+    //   once, whatever its health (TwinFell), and it goes on casting its spell while it hunts alone: at another player
+    //   in the fight, or with no other, at its own quarry (OtherPlayer)
     // Whether it's come, and when, are in its ZDO, for every game's looks; its owner's game decides and casts
     internal class TwinsPhase : MonoBehaviour
     {
@@ -158,7 +161,7 @@ namespace NhxMagicWeapons.Bosses
             {
                 if (m_humanoid.GetHealthPercentage() <= Threshold)
                 {
-                    Enrage();
+                    Enrage(null);
                 }
                 return;
             }
@@ -199,12 +202,22 @@ namespace NhxMagicWeapons.Bosses
             m_flare = Mathf.MoveTowards(m_flare, 0f, dt * FlareFade);
         }
 
-        private void Enrage()
+        // Its twin fell (TwinsBond.Fell, on its owner's game): alone, its second phase comes now, whatever its health,
+        // with its transition and its line, as at half its health
+        internal void TwinFell()
+        {
+            if (m_nview && m_nview.IsValid() && m_nview.IsOwner() && m_humanoid && !m_humanoid.IsDead() && !Enraged)
+            {
+                Enrage("its twin fell");
+            }
+        }
+
+        private void Enrage(string why)
         {
             ZDO zdo = m_nview.GetZDO();
             zdo.Set(s_enragedKey, true);
             zdo.Set(s_enragedAtKey, Now);
-            TwinsLog.Event($"{TwinsLog.Name(m_boss)} enters its second phase at {100f * m_humanoid.GetHealthPercentage():0}% health.");
+            TwinsLog.Event($"{TwinsLog.Name(m_boss)} enters its second phase at {100f * m_humanoid.GetHealthPercentage():0}% health{(why != null ? $" ({why})" : "")}.");
             // Its line (the user's recordings: TwinsVoices), queued behind its twin's if both come at once
             TwinsVoices.Say(m_boss.Element == Element.Storm ? TwinsVoices.BlueP2 : TwinsVoices.RedP2, transform.position,
                 $"the {TwinsLog.Name(m_boss)} enters its second phase");
@@ -350,7 +363,8 @@ namespace NhxMagicWeapons.Bosses
         }
 
         // Whom its phase's spell goes to: watching, its one player; hunting, its twin's quarry if that isn't its own, or
-        // the nearest other player in the fight; none, nobody
+        // the nearest other player in the fight, or, its twin fallen and no other player there, its own quarry (until the
+        // redesign a lone hunter facing one player never cast it); none, nobody
         private Player OtherPlayer()
         {
             Character mine = m_boss.m_target;
@@ -381,6 +395,10 @@ namespace NhxMagicWeapons.Bosses
                     best = distance;
                     nearest = player;
                 }
+            }
+            if (!nearest && mine is Player quarry && Fighter(quarry) && TwinsBond.Alone(m_boss))
+            {
+                return quarry;
             }
             return nearest;
         }
