@@ -96,6 +96,13 @@ namespace NhxMagicWeapons.Bosses
         private float m_outOfReach;
         private float m_nextRush;
         private float m_lastWard = -WardEvery;
+        // Its answer to a clean staff's draw, on its way: when its rune strikes, and where (RPC_Punish, Arrive)
+        private float m_answerAt;
+        private Vector3 m_answerPoint;
+
+        // Its rune is out for a clean staff's draw: it starts no attack until it has struck (TwinsAI), so it's free to
+        // land on it
+        internal bool Answering => m_answerAt > 0f;
 
         internal Element Element => (Element)m_element;
 
@@ -166,7 +173,7 @@ namespace NhxMagicWeapons.Bosses
             }
             if (m_nview)
             {
-                m_nview.Register<ZDOID>(PunishRpc, RPC_Punish);
+                m_nview.Register<ZDOID, bool>(PunishRpc, RPC_Punish);
                 m_nview.Register<Vector3>(WardRpc, RPC_Ward);
                 TwinsBond.Register(this);
             }
@@ -226,7 +233,13 @@ namespace NhxMagicWeapons.Bosses
             {
                 m_role = Role.None;
                 m_target = null;
+                m_answerAt = 0f;
                 return;
+            }
+            if (m_answerAt > 0f && Time.time >= m_answerAt)
+            {
+                m_answerAt = 0f;
+                Arrive();
             }
             m_roleTimer -= Time.deltaTime;
             if (m_roleTimer <= 0f)
@@ -263,7 +276,7 @@ namespace NhxMagicWeapons.Bosses
                 m_outOfReach = 0f;
                 m_nextRush = Time.time + RushCooldown;
                 TwinsLog.Event($"{TwinsLog.Name(this)} has been out of reach of {TwinsLog.Name(target)} for {ChaseDelay:0} s.");
-                Rush(target, Element == Element.Storm ? StormChaseGap : ArriveGap);
+                Rush(target.transform.position, Element == Element.Storm ? StormChaseGap : ArriveGap, TwinsLog.Name(target));
             }
         }
 
@@ -287,10 +300,14 @@ namespace NhxMagicWeapons.Bosses
             m_level = level;
         }
 
-        // A player drew its staff after the other (TwinsDuel.Draw): smitten at once, then the boss is on them in a flash,
-        // a blink for the Stormcaller (Lightning Step's), a comet for the Firecaller (the Firecaller's Regalia's). Its
-        // targeting follows from the draw (TwinsAI). On its owner's game
-        private void RPC_Punish(long sender, ZDOID playerID)
+        // A player drew its staff after the other (TwinsDuel.Draw), and it answers (the fight's redesign, agreed with the
+        // user 2026-11-15, its change 3). Its targeting follows from the draw (TwinsAI). On its owner's game:
+        // - A staff still charged: smitten at once, unavoidable, then the boss is on them in a flash, a blink for the
+        //   Stormcaller (Lightning Step's), a comet for the Firecaller (the Firecaller's Regalia's); until the redesign,
+        //   every swap's answer
+        // - A clean staff: its rune under them (ElementRune, the size and warning TwinsDuel gives), which strikes whoever
+        //   is still on it; as it strikes, the twin lands on it, if it's free (Arrive), and hunts from there
+        private void RPC_Punish(long sender, ZDOID playerID, bool clean)
         {
             if (!m_nview.IsOwner() || !m_humanoid || m_humanoid.IsDead())
             {
@@ -302,12 +319,44 @@ namespace NhxMagicWeapons.Bosses
             {
                 return;
             }
-            TwinsLog.Event($"{TwinsLog.Name(this)} punishes {TwinsLog.Name(player)}'s swap: a smite of {TwinsDuel.SwapDamage:0}, then a rush.");
-            TwinsDuel.Smite(Element, player, m_humanoid, TwinsDuel.SwapDamage, TwinsDuel.SmiteRadius);
-            Rush(player, ArriveGap);
-            m_nextRush = Time.time + RushCooldown;
             m_roleTimer = 0f;
+            if (!clean)
+            {
+                TwinsLog.Event($"{TwinsLog.Name(this)} punishes {TwinsLog.Name(player)}'s swap to a staff still charged: a smite of {TwinsDuel.SwapDamage:0}, then a rush.");
+                TwinsDuel.Smite(Element, player, m_humanoid, TwinsDuel.SwapDamage, TwinsDuel.SmiteRadius);
+                Rush(player.transform.position, ArriveGap, TwinsLog.Name(player));
+                m_nextRush = Time.time + RushCooldown;
+                return;
+            }
+            Vector3 point = LightningStrike.Ground(player.transform.position);
+            GameObject prefab = Element == Element.Storm ? TwinsDuel.s_stormRune : TwinsDuel.s_fireRune;
+            ElementRune rune = prefab ? ElementRune.Create(prefab, point, TwinsDuel.AnswerDelay, TwinsDuel.AnswerRadius) : null;
+            if (rune)
+            {
+                rune.m_caster = m_humanoid;
+                rune.m_hit = TwinsDuel.AnswerHit(Element, m_humanoid);
+            }
+            m_answerAt = Time.time + TwinsDuel.AnswerDelay;
+            m_answerPoint = point;
+            TwinsLog.Event($"{TwinsLog.Name(this)} answers {TwinsLog.Name(player)}'s swap to a clean staff: its rune at {TwinsLog.At(point)}"
+                + $"{(rune ? "" : " (missing)")}, striking for {TwinsDuel.SwapDamage:0} in {TwinsDuel.AnswerDelay:0.0} s.");
         }
+
+        // Its rune strikes (RPC_Punish), and it lands on it: unless it's in the middle of an attack, or stands for its
+        // second phase's coming or its comet's warning (Rush), when the rune strikes without it and it hunts once it's done
+        private void Arrive()
+        {
+            if (m_humanoid.InAttack())
+            {
+                TwinsLog.Event($"{TwinsLog.Name(this)}'s rune strikes without it: in the middle of an attack.");
+                return;
+            }
+            Rush(m_answerPoint, AnswerGap, "its rune");
+            m_nextRush = Time.time + RushCooldown;
+        }
+
+        // It lands this far short of its rune's middle (meters): on the rune, not on a player who stayed there
+        private const float AnswerGap = 1.5f;
 
         // Its own element's staff struck it at `point`, to nothing (TwinsRules.StavesOnly, on its owner's game): its ward
         // flashes there on every game (WardFlash), so whoever struck sees why no number came
@@ -338,8 +387,9 @@ namespace NhxMagicWeapons.Bosses
             WardFlash.Show(this, point);
         }
 
-        // In a flash to `gap` short of `target`, along the ground (LightningStep.Walk), drawn as its element's
-        private void Rush(Character target, float gap)
+        // In a flash to `gap` short of `point`, along the ground (LightningStep.Walk), drawn as its element's; `toward`
+        // for the log
+        private void Rush(Vector3 point, float gap, string toward)
         {
             // Not while it stands for its second phase's coming or its comet's warning (TwinsPhase)
             if (m_phase && m_phase.Busy(out _))
@@ -348,7 +398,7 @@ namespace NhxMagicWeapons.Bosses
                 return;
             }
             Vector3 start = transform.position;
-            Vector3 flat = target.transform.position - start;
+            Vector3 flat = point - start;
             flat.y = 0f;
             float distance = flat.magnitude;
             if (distance <= gap + 1f)
@@ -358,10 +408,10 @@ namespace NhxMagicWeapons.Bosses
             Vector3 dir = flat / distance;
             if (!Flash(dir, distance - gap, out Vector3 from, out Vector3 to))
             {
-                TwinsLog.Event($"{TwinsLog.Name(this)}'s rush at {TwinsLog.Name(target)}: nowhere to land, none.");
+                TwinsLog.Event($"{TwinsLog.Name(this)}'s rush at {toward}: nowhere to land, none.");
                 return;
             }
-            TwinsLog.Event($"{TwinsLog.Name(this)} rushes at {TwinsLog.Name(target)}: {Vector3.Distance(from, to):0} m.");
+            TwinsLog.Event($"{TwinsLog.Name(this)} rushes at {toward}: {Vector3.Distance(from, to):0} m.");
             Quaternion rotation = Quaternion.LookRotation(dir);
             if (Element == Element.Storm)
             {

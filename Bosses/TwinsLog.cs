@@ -22,7 +22,7 @@ namespace NhxMagicWeapons.Bosses
     //   the second phase and its spells, creatures held, draws and swaps, overloads, judgment, rushes, a fallen twin's
     //   element going silent and sounding again
     // - The staves' duel (TwinsDuel; the user, 2026-11-15: "when players swap staves, the number of stacks, the hits they
-    //   take and deliver, the vulnerability debuffs"): every stack with both charges (in hand or held) and the regen
+    //   take and deliver, the vulnerability debuffs"): every stack with both charges (in hand or draining) and the regen
     //   left, every swap with how long the old staff was out and what became of both charges, Stormstruck and
     //   Flamestruck as they come, grow and wear off with the resistance they leave; on every hit the local player takes,
     //   what the duel has put on them. The local player's hits on a twin another game runs, as sent (that game logs what

@@ -248,6 +248,13 @@ namespace NhxMagicWeapons.Bosses
                     __result = false;
                     return;
                 }
+                // Its rune is out for a clean staff's draw: nothing new until it has struck, so it can land on it
+                // (CallerBoss.Arrive)
+                if (boss.Answering)
+                {
+                    __result = false;
+                    return;
+                }
                 if (!boss.m_target)
                 {
                     return;

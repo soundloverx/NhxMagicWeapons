@@ -3,6 +3,8 @@
 ## v2.1.0
 - A staff can no longer hurt its own caller: the Staff of Storms does nothing to the Stormcaller, nor the Wrath of Muspelheim to the Firecaller, whose ward flashes where it's struck. The twin hunting you is the one you can't hurt, so a staff swap is a target swap. It stops what you aim through it, and chains, tendrils, the Eye of the Storm and the Regalia's thread no longer pick it
 - While a twin is down, its element is silent: its charge goes and builds no more, no overload comes of it, and drawing its staff gets no answer. If the twin rises, its charge builds again from none
+- A staff's charge is no longer held at 4 once you draw the other staff: it drains to nothing over 20 seconds, from whatever it was, and its icon counts the seconds down. Draw the staff again before it's gone and the charge builds on from where it is. A swap no longer starts a charge's clock again
+- Drawing a clean staff (its charge gone) is answered with the twin's rune under you: step off it within about a second and you take nothing, as the twin lands on it. Drawing a staff still charged is answered at once, as before
 - A twin left alone enters its second phase at once, hunts whoever holds its fallen twin's staff, and keeps casting its second-phase spell, at its own quarry when it faces one player
 
 ## v2.0.0
