@@ -14,8 +14,8 @@ namespace NhxMagicWeapons.Bosses
     // Each is an item the boss holds, as every monster's attacks are (Yagluth's beam and meteors too): a copy of a Fuling
     // shaman's fireball attack with no model, so nothing shows in the hands, with our attack in it. The AI picks it when
     // its target is within range and the interval has passed, turns to it, and plays the attack on the player's
-    // animations; the game makes the hit (the item's damage, times the boss's level and the world's modifiers, which is
-    // where CLLC's stars come in), and our projectile spends it.
+    // animations; the game makes the hit (the item's damage, with the world's modifiers and CLLC's damage for the players
+    // near; no stars, which the twins never have: CallerBosses), and our projectile spends it.
     // Their numbers are first guesses, to tune by watching them (the user: "If I turn on god mode, they can attack me and I
     // can observe"). Against armor: a hit under twice the armor is cut to hit² / (4 × armor), so 200 lightning does 100
     // to a player with 100 armor, and 100 fire 25

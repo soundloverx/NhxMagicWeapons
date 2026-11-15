@@ -119,7 +119,12 @@ namespace NhxMagicWeapons.Bosses
             humanoid.m_group = "";
             humanoid.m_faction = Character.Faction.Boss;
             // Bosses (since 2026-11-14, "start on step 1"): their bars at the top of the screen (BossBars stacks them), their
-            // music (TwinsMusic), and CLLC's way with bosses on the server (the user: "We will let CLLC affect them")
+            // music (TwinsMusic). Of CLLC (the user: "We will let CLLC affect them"), only its scaling by the players within
+            // 200 m reaches them, on each hit: less taken by them, more dealt by them. It rolls a boss's stars and affix
+            // only as an offering bowl or a spawner makes it, and the altar makes the twins itself (TwinsBond.Summon, Raise),
+            // so they have neither, and its world level (the server's "Fluid") doesn't touch them. Left so (2026-11-15, CLLC
+            // 5.0.7 read): the server's chances give every boss 3 to 9 stars and one affix, which would be rolled for each
+            // twin apart, and its Twin affix would add a third caller, linked to neither
             humanoid.m_boss = true;
             humanoid.m_bossEvent = TwinsMusic.EventName;
             humanoid.m_health = Health;
