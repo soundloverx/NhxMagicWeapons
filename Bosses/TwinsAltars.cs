@@ -12,7 +12,7 @@ namespace NhxMagicWeapons.Bosses
     // - The dais: a ruined Ashlands floor, the sigil's three rings turning on it (blue, violet, orange), four broken
     //   pillars at its corners, the twins' crystals circling over its middle (TwinsAltar: offer a lodestone there)
     // - The arena: Stones twisted pillar bases ArenaRadius out, each crowned with a floating crystal, storm and fire in
-    //   turn, with a light and motes, settled on the ground as it spawns (SnapToGround)
+    //   turn, with a light and motes, standing at the dais's ground height (the leveled arena's; BuildStones)
     // - The ground leveled and cleared about the dais (TerrainModifier), and no building within NoBuildRadius (the
     //   game's no-build zone of locations: Location.m_noBuild, as at its boss altars)
     // Built as the game builds its locations: every game makes the location's looks from a networked LocationProxy, so an
@@ -21,8 +21,11 @@ namespace NhxMagicWeapons.Bosses
     // important buildings (dungeons or even Fader's arena). Since the world is already generated, maybe we need an admin
     // command to spawn the 3 altars?"): a new world generates Quantity of them in the Ashlands by itself; on a world
     // already made, the game only places locations in zones not yet generated, so nhx_altar generate (an admin, run by
-    // the server) finds spots for them (Generate) and nhx_altar place puts one where the admin stands (Place). Both
-    // register the altar as a location, so a lodestone finds it (Game.DiscoverClosestLocation)
+    // the server) finds spots for them (Generate) and nhx_altar place puts one where the admin stands (Place; with force,
+    // the places in the way removed first, mods' and the game's but for its bosses, traders and such: RemoveLocation.
+    // The user, 2026-11-15: "make nhx_altar place a bit more forceful and let it maybe remove other modded places, like
+    // RtD dungeons", then the game's ruins too). Both register the altar as a location, so a lodestone finds it
+    // (Game.DiscoverClosestLocation)
     internal static class TwinsAltars
     {
         internal const string LocationName = "NhxTwinsAltar";
@@ -133,7 +136,11 @@ namespace NhxMagicWeapons.Bosses
             Looks.Twins(root, middle + Vector3.up * 2.2f, 0.55f);
         }
 
-        // The arena's edge: twisted pillar bases crowned with crystals, storm and fire in turn
+        // The arena's edge: twisted pillar bases crowned with crystals, storm and fire in turn. At the root's height, not
+        // snapped to the ground: the arena is leveled to exactly that out to ArenaRadius + 2 (Heightmap.LevelTerrain), but
+        // a SnapToGround snaps as the looks are built, before the leveling is in the heightmap, so it found the land as
+        // it was (the user, 2026-11-15: "some are left floating and others get buried"). It was there from when only the
+        // dais was leveled
         private static void BuildStones(Transform root)
         {
             for (int i = 0; i < Stones; i++)
@@ -144,7 +151,6 @@ namespace NhxMagicWeapons.Bosses
                 holder.transform.SetParent(root, false);
                 holder.transform.localPosition = at;
                 holder.transform.localRotation = Quaternion.LookRotation(-at);
-                holder.AddComponent<SnapToGround>();
                 GameObject stone = Looks.Copy("Ashlands_Ruins_twist_PillarBaseSmall", holder.transform, Vector3.zero, Quaternion.identity, 1f, s_missing);
                 float top = 1f;
                 if (stone)
@@ -173,26 +179,27 @@ namespace NhxMagicWeapons.Bosses
         {
             private static void Postfix()
             {
-                ZRoutedRpc.instance.Register<Vector3, float>(PlaceRpc, RPC_Place);
+                ZRoutedRpc.instance.Register<Vector3, float, bool>(PlaceRpc, RPC_Place);
                 ZRoutedRpc.instance.Register<int>(GenerateRpc, RPC_Generate);
                 ZRoutedRpc.instance.Register<Vector3>(CleanRpc, RPC_Clean);
+                ZRoutedRpc.instance.Register<Vector3>(RemoveRpc, RPC_Remove);
                 ZRoutedRpc.instance.Register<string>(ReportRpc, RPC_Report);
             }
         }
 
         // From an admin's console (AltarCommand): run by the server
-        internal static void RequestPlace(Vector3 point, float yaw) => ZRoutedRpc.instance.InvokeRoutedRPC(PlaceRpc, point, yaw);
+        internal static void RequestPlace(Vector3 point, float yaw, bool force) => ZRoutedRpc.instance.InvokeRoutedRPC(PlaceRpc, point, yaw, force);
 
         internal static void RequestGenerate(int count) => ZRoutedRpc.instance.InvokeRoutedRPC(GenerateRpc, count);
 
-        private static void RPC_Place(long sender, Vector3 point, float yaw)
+        private static void RPC_Place(long sender, Vector3 point, float yaw, bool force)
         {
             if (!ZNet.instance || !ZNet.instance.IsServer() || !IsAdmin(sender))
             {
                 return;
             }
-            Report(sender, Place(point, yaw, out string why)
-                ? $"An altar of the elements now stands at {Where(point)}, its arena cleared ({s_cleared} things removed)."
+            Report(sender, Place(point, yaw, force, out string why)
+                ? $"An altar of the elements now stands at {Where(point)}, its arena cleared ({s_cleared} things removed).{s_removed}"
                 : "No altar: " + why);
         }
 
@@ -234,8 +241,10 @@ namespace NhxMagicWeapons.Bosses
             return ZoneSystem.instance ? ZoneSystem.instance.m_locations.Find(l => l != null && l.m_prefabName == LocationName) : null;
         }
 
-        // An altar at `point`, if it's clear of every other location; registered (for lodestones) and built
-        private static bool Place(Vector3 point, float yaw, out string why)
+        // An altar at `point`, if it's clear of every other location (with `force`, those in the way removed first, but
+        // for altars and the game's that stay: s_kept); registered (for lodestones) and built. What's in the way is
+        // named, each with what it is and how far, so the admin knows where to stand or whether force would do
+        private static bool Place(Vector3 point, float yaw, bool force, out string why)
         {
             ZoneSystem.ZoneLocation location = Location();
             if (location == null)
@@ -243,16 +252,35 @@ namespace NhxMagicWeapons.Bosses
                 why = "the altar isn't in the game (see the log).";
                 return false;
             }
-            if (ZoneSystem.instance.ZoneHasLocation(point))
+            s_removed = "";
+            List<ZoneSystem.LocationInstance> inWay = InTheWay(point);
+            if (inWay.Count > 0)
             {
-                why = "this zone already has a location.";
-                return false;
-            }
-            string near = NearLocation(point);
-            if (near != null)
-            {
-                why = $"too close to {near}.";
-                return false;
+                Vector2s zone = ZoneSystem.GetZone(point);
+                List<string> names = new List<string>();
+                bool stuck = false;
+                foreach (ZoneSystem.LocationInstance instance in inWay)
+                {
+                    bool removable = Removable(instance);
+                    stuck |= !removable;
+                    string kind = instance.m_location.m_prefabName == LocationName ? "an altar, kept" : !removable ? "the game's, kept"
+                        : Modded(instance) ? "modded" : "the game's";
+                    string here = ZoneSystem.GetZone(instance.m_position) == zone ? ", in this zone" : "";
+                    names.Add($"{instance.m_location.m_prefabName} ({kind}, {Utils.DistanceXZ(instance.m_position, point):0} m away{here})");
+                }
+                if (stuck || !force)
+                {
+                    why = $"in the way: {string.Join("; ", names)}. "
+                        + (stuck ? "Altars and the game's bosses, traders, start temple and Hildir's dungeons stay, even with force: stand away from them."
+                            : "nhx_altar place force removes them.");
+                    return false;
+                }
+                List<string> removed = new List<string>();
+                foreach (ZoneSystem.LocationInstance instance in inWay)
+                {
+                    removed.Add($"{instance.m_location.m_prefabName} at {Where(instance.m_position)} ({RemoveLocation(instance)} objects)");
+                }
+                s_removed = $" Removed first: {string.Join("; ", removed)}.";
             }
             point.y = ZoneSystem.instance.GetGroundHeight(point, out float height) ? height : WorldGenerator.instance.GetHeight(point.x, point.z);
             AccessTools.Method(typeof(ZoneSystem), "RegisterLocation").Invoke(ZoneSystem.instance, new object[] { location, point, true });
@@ -263,8 +291,153 @@ namespace NhxMagicWeapons.Bosses
             return true;
         }
 
-        // How much the last Place cleared, for its report
+        // How much the last Place cleared, and what places it removed (force), for its report
         private static int s_cleared;
+        private static string s_removed = "";
+
+        // ---- Removing a place in the way ----
+
+        // A place nhx_altar place force may remove: a mod's or the game's, but never an altar nor one of s_kept
+        private static bool Removable(ZoneSystem.LocationInstance instance)
+        {
+            string name = instance.m_location.m_prefabName;
+            return name != LocationName && !s_kept.Contains(name);
+        }
+
+        // The game's places that stay, force or not: its bosses' altars and arenas, its traders, the start temple and
+        // Hildir's quest dungeons (names checked in the game's own asset manifest, 2026-11-15). Every other may go, the
+        // game's ruins, dungeons and camps too (the user, 2026-11-15: "can we make the force command also remove the
+        // vanilla structures? For example, I see ruins we can destroy, they are useless.")
+        private static readonly HashSet<string> s_kept = new HashSet<string>
+        {
+            "StartTemple", "Eikthyrnir", "GDKing", "Bonemass", "Dragonqueen", "GoblinKing", "Mistlands_DvergrBossEntrance1",
+            "FaderLocation", "Vendor_BlackForest", "Hildir_camp", "BogWitch_Camp", "Hildir_cave", "Hildir_crypt",
+            "Hildir_plainsfortress",
+        };
+
+        // A place a mod added (for what's in the way, named): one not among the game's own
+        private static bool Modded(ZoneSystem.LocationInstance instance)
+        {
+            return s_gameLocations.Count > 0 && !s_gameLocations.Contains(instance.m_location.m_prefabName);
+        }
+
+        // The game's own locations, by name: its location lists' (and its alternate biomes'), gathered as it sets them up
+        // for a world. Every other is a mod's, whether through Jotunn (RtD, More World Locations) or blaxxun's
+        // LocationManager (Monstrum, Warfare, Jewelcrafting...: straight into ZoneSystem.m_locations, so Jotunn's own
+        // list wouldn't do)
+        private static readonly HashSet<string> s_gameLocations = new HashSet<string>();
+
+        [HarmonyPatch(typeof(ZoneSystem), "SetupLocations")]
+        private static class GameLocations
+        {
+            private static void Prefix()
+            {
+                s_gameLocations.Clear();
+                foreach (LocationList list in LocationList.GetAllLocationLists())
+                {
+                    list.m_locations.ForEach(Add);
+                }
+                foreach (AltBiome alt in AltBiomeList.m_altBiomes)
+                {
+                    alt.m_addLocations.ForEach(Add);
+                }
+            }
+
+            private static void Add(ZoneSystem.ZoneLocation location)
+            {
+                if (location != null && location.m_prefab.IsValid)
+                {
+                    s_gameLocations.Add(location.m_prefab.Name);
+                }
+            }
+        }
+
+        // Objects this high are a dungeon's (the game builds interiors 5000 m above their zone)
+        private const float InteriorAltitude = 1000f;
+
+        // A location gone from the world, on the server: out of the game's list (no zone holds it; no lodestone, vegvisir
+        // or map icon finds it), its looks (the proxy every game builds them from, with its terrain changes) and what it
+        // spawned (its buildings, chests, spawners, creatures...: what no player made within its radius, and its
+        // dungeon's, high above its zone). Never a player, a tame, a tombstone, an item or what a player built (left where
+        // they are), nor the zone's own (its spawn controller, the players' terrain edits). How many objects went
+        private static int RemoveLocation(ZoneSystem.LocationInstance instance)
+        {
+            ZoneSystem zones = ZoneSystem.instance;
+            Vector2s zone = ZoneSystem.GetZone(instance.m_position);
+            zones.m_locationInstances.Remove(zone);
+            Uncache(zones.m_locationIDCache, instance);
+            Uncache(zones.m_locationGroupCache, instance);
+            Uncache(zones.m_locationMaxGroupCache, instance);
+
+            int location = instance.m_location.m_prefab.Name.GetStableHashCode();
+            int proxy = zones.m_locationProxyPrefab.name.GetStableHashCode();
+            float reach = instance.m_location.m_exteriorRadius + ClearMargin;
+            Dictionary<int, bool> kept = new Dictionary<int, bool>();
+            List<ZDO> doomed = new List<ZDO>();
+            foreach (ZDO zdo in ZDOMan.instance.m_objectsByID.Values)
+            {
+                if (zdo == null)
+                {
+                    continue;
+                }
+                Vector3 at = zdo.GetPosition();
+                bool its;
+                if (zdo.GetPrefab() == proxy)
+                {
+                    // Its own, not a neighbor's
+                    its = ZoneSystem.GetZone(at) == zone && zdo.GetInt(ZDOVars.s_location) == location;
+                }
+                else
+                {
+                    its = (at.y > InteriorAltitude ? ZoneSystem.GetZone(at) == zone : Utils.DistanceXZ(at, instance.m_position) <= reach)
+                        && !Kept(zdo, kept);
+                }
+                if (its)
+                {
+                    doomed.Add(zdo);
+                }
+            }
+            foreach (ZDO zdo in doomed)
+            {
+                zdo.SetOwner(ZDOMan.GetSessionID());
+                ZDOMan.instance.DestroyZDO(zdo);
+            }
+            if (instance.m_location.m_iconAlways || instance.m_location.m_iconPlaced)
+            {
+                AccessTools.Method(typeof(ZoneSystem), "SendLocationIcons").Invoke(zones, new object[] { 0L });
+            }
+            Plugin.Log.LogInfo($"Removed the location {instance.m_location.m_prefabName} at {Where(instance.m_position)} ({doomed.Count} objects) for an altar.");
+            return doomed.Count;
+        }
+
+        // The game's caches of where each kind of location is (for their distances apart), without this one
+        private static void Uncache<T>(Dictionary<T, List<ZoneSystem.LocationInstance>> cache, ZoneSystem.LocationInstance instance)
+        {
+            foreach (List<ZoneSystem.LocationInstance> list in cache.Values)
+            {
+                list.RemoveAll(i => i.m_location == instance.m_location && i.m_position == instance.m_position);
+            }
+        }
+
+        // What a location's removal leaves: what a player made or tamed, a player, a tombstone, an item, a location's
+        // proxy, and the zone's own (its spawn controller, its terrain edits). By prefab, `kept` remembering
+        private static bool Kept(ZDO zdo, Dictionary<int, bool> kept)
+        {
+            if (zdo.GetLong(ZDOVars.s_creator) != 0L || zdo.GetBool(ZDOVars.s_tamed))
+            {
+                return true;
+            }
+            int prefab = zdo.GetPrefab();
+            if (!kept.TryGetValue(prefab, out bool keep))
+            {
+                GameObject made = ZNetScene.instance.GetPrefab(prefab);
+                keep = !made || made.GetComponent<Player>() || made.GetComponent<TombStone>() || made.GetComponent<ItemDrop>()
+                    || made.GetComponent<LocationProxy>() || made.GetComponent<TerrainComp>()
+                    || made.name == ZoneSystem.instance.m_zoneCtrlPrefab.name;
+                kept[prefab] = keep;
+            }
+            return keep;
+        }
 
         // ---- Clearing the arena ----
 
@@ -341,7 +514,15 @@ namespace NhxMagicWeapons.Bosses
             {
                 return;
             }
-            Vector3 altar = Vector3.zero;
+            Report(sender, !NearestAltar(point, out ZoneSystem.LocationInstance altar)
+                ? $"No altar within {CleanReach:0} m."
+                : $"The arena at {Where(altar.m_position)} is cleared: {ClearDebris(altar.m_position)} things removed.");
+        }
+
+        // The altar nearest `point`, if one is within CleanReach
+        private static bool NearestAltar(Vector3 point, out ZoneSystem.LocationInstance altar)
+        {
+            altar = default;
             float nearest = float.PositiveInfinity;
             foreach (ZoneSystem.LocationInstance instance in ZoneSystem.instance.GetLocationList())
             {
@@ -349,24 +530,74 @@ namespace NhxMagicWeapons.Bosses
                 if (instance.m_location.m_prefabName == LocationName && distance < nearest)
                 {
                     nearest = distance;
-                    altar = instance.m_position;
+                    altar = instance;
                 }
             }
-            Report(sender, nearest > CleanReach ? $"No altar within {CleanReach:0} m." : $"The arena at {Where(altar)} is cleared: {ClearDebris(altar)} things removed.");
+            return nearest <= CleanReach;
         }
 
-        // The location whose edge is within reach of an altar's at `point`, or null
-        private static string NearLocation(Vector3 point)
+        // ---- Removing one ----
+
+        // An admin's ask to remove the altar nearest them (within CleanReach; the user, 2026-11-15: "add nhx_altar
+        // remove"), as place force removes a modded place (RemoveLocation): gone from the game's list (its zone free
+        // again, one fewer for generate to count) and from the world, its ground back as it was (the leveling was its
+        // own). What it cleared stays cleared. Not while the twins are near it
+        internal static void RequestRemove(Vector3 point) => ZRoutedRpc.instance.InvokeRoutedRPC(RemoveRpc, point);
+
+        private const string RemoveRpc = "NhxAltarRemove";
+
+        private static void RPC_Remove(long sender, Vector3 point)
         {
+            if (!ZNet.instance || !ZNet.instance.IsServer() || !IsAdmin(sender))
+            {
+                return;
+            }
+            if (!NearestAltar(point, out ZoneSystem.LocationInstance altar))
+            {
+                Report(sender, $"No altar within {CleanReach:0} m.");
+                return;
+            }
+            if (TwinsNear(altar.m_position))
+            {
+                Report(sender, $"The twins are at the altar at {Where(altar.m_position)}: not removed.");
+                return;
+            }
+            Report(sender, $"The altar at {Where(altar.m_position)} is gone ({RemoveLocation(altar)} objects removed).");
+        }
+
+        // Whether a twin is within TwinsAltar.Busy of `point`, as the dais asks before calling them; from the twins'
+        // ZDOs, which the server holds all of (a dedicated one doesn't make the twins themselves, so CallerBoss.All
+        // wouldn't do)
+        private static bool TwinsNear(Vector3 point)
+        {
+            int storm = CallerBosses.StormName.GetStableHashCode();
+            int fire = CallerBosses.FireName.GetStableHashCode();
+            foreach (ZDO zdo in ZDOMan.instance.m_objectsByID.Values)
+            {
+                if (zdo != null && (zdo.GetPrefab() == storm || zdo.GetPrefab() == fire)
+                    && Vector3.Distance(zdo.GetPosition(), point) < TwinsAltar.Busy)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // The locations in the way of an altar at `point`: the one in its zone (a zone holds one), and those whose edge
+        // is within reach of the altar's
+        private static List<ZoneSystem.LocationInstance> InTheWay(Vector3 point)
+        {
+            List<ZoneSystem.LocationInstance> inWay = new List<ZoneSystem.LocationInstance>();
+            Vector2s zone = ZoneSystem.GetZone(point);
             foreach (ZoneSystem.LocationInstance instance in ZoneSystem.instance.GetLocationList())
             {
                 float reach = Mathf.Max(instance.m_location.m_exteriorRadius, instance.m_location.m_interiorRadius) + NoBuildRadius + LocationMargin;
-                if (Utils.DistanceXZ(instance.m_position, point) < reach)
+                if (ZoneSystem.GetZone(instance.m_position) == zone || Utils.DistanceXZ(instance.m_position, point) < reach)
                 {
-                    return instance.m_location.m_prefabName;
+                    inWay.Add(instance);
                 }
             }
-            return null;
+            return inWay;
         }
 
         // Up to `wanted` altars in the world, the ones missing placed in the Ashlands: on flat ground out of the lava,
@@ -400,7 +631,7 @@ namespace NhxMagicWeapons.Bosses
                 {
                     continue;
                 }
-                if (Place(point, Random.Range(0f, 360f), out _))
+                if (Place(point, Random.Range(0f, 360f), false, out _))
                 {
                     altars.Add(point);
                     placed.Add(Where(point));
@@ -441,7 +672,7 @@ namespace NhxMagicWeapons.Bosses
                     }
                 }
             }
-            if (ZoneSystem.instance.ZoneHasLocation(point) || NearLocation(point) != null)
+            if (InTheWay(point).Count > 0)
             {
                 return false;
             }
@@ -485,7 +716,7 @@ namespace NhxMagicWeapons.Bosses
     internal class TwinsAltar : MonoBehaviour, Hoverable, Interactable
     {
         // Twins within this of the altar are a fight already going
-        private const float Busy = 90f;
+        internal const float Busy = 90f;
 
         public string GetHoverText()
         {
