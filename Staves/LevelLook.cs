@@ -21,7 +21,8 @@ namespace NhxMagicWeapons.Staves
         private const int Retries = 20;
 
         // In a character preview (IsPreview), the local player's level is looked at again this often: the preview doesn't
-        // make the staff anew when only its level changes
+        // make the staff anew when only its level changes, and a staff it shows before the player has it (OwnLevel) is
+        // shown right once the player does
         private const float FollowInterval = 0.5f;
 
         private int m_retries;
@@ -119,10 +120,10 @@ namespace NhxMagicWeapons.Staves
                 }
                 if (IsPreview(equipment))
                 {
-                    int own = SlotLevel(Player.m_localPlayer.m_visEquipment, slot, hash);
+                    m_preview = true;
+                    int own = OwnLevel(slot, hash);
                     if (own > 0)
                     {
-                        m_preview = true;
                         return own;
                     }
                 }
@@ -148,6 +149,42 @@ namespace NhxMagicWeapons.Staves
             Player local = Player.m_localPlayer;
             return local && equipment != local.m_visEquipment && equipment.GetComponent<Player>()
                 && !(equipment.m_nview && equipment.m_nview.IsValid());
+        }
+
+        // The level of the local player's own item in `slot`, if it's the item `hash`; 0 if not. Its equipped items first,
+        // then what its VisEquipment shows. The user (2026-11-16): in the preview the staff in hand was at level 1, while
+        // sheathed it was right. AzuEPI also mirrors the player right after Humanoid.EquipItem (drawing the staff, or
+        // equipping it), before the player's own VisEquipment has the staff in hand: it only does on its next
+        // CustomUpdate, often after this preview staff's Start. Sheathing goes through UnequipItem before the hidden item
+        // is set, so the back staff reaches the preview only after the player's own VisEquipment shows it
+        private static int OwnLevel(VisSlot slot, int hash)
+        {
+            Player local = Player.m_localPlayer;
+            ItemDrop.ItemData item;
+            switch (slot)
+            {
+                case VisSlot.HandRight:
+                    item = local.m_rightItem;
+                    break;
+                case VisSlot.BackRight:
+                    item = local.m_hiddenRightItem;
+                    break;
+                case VisSlot.HandLeft:
+                    item = local.m_leftItem;
+                    break;
+                case VisSlot.BackLeft:
+                    item = local.m_hiddenLeftItem;
+                    break;
+                default:
+                    item = null;
+                    break;
+            }
+            // The hash the game shows the item by (Humanoid.SetupVisEquipment)
+            if (item != null && item.m_dropPrefab && item.m_dropPrefab.name.GetStableHashCode() == hash)
+            {
+                return item.m_quality;
+            }
+            return SlotLevel(local.m_visEquipment, slot, hash);
         }
 
         // The level of what `equipment` shows in `slot`, if it's the item `hash`; 0 if not
