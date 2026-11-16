@@ -25,6 +25,7 @@ namespace NhxMagicWeapons.Bosses
         internal static readonly int LevelKey = "nhx_boss_level".GetStableHashCode();
         internal const string PunishRpc = "NhxTwinsPunish";
         private const string WardRpc = "NhxTwinsWard";
+        internal const string PresentRpc = "NhxTwinsPresent";
 
         // Its element (Element: the staff whose drawing it answers)
         public int m_element;
@@ -89,6 +90,8 @@ namespace NhxMagicWeapons.Bosses
         // On its owner's game: its role and whom it goes after (null: as its AI would)
         internal Role m_role;
         internal Character m_target;
+        // On its owner's game: until when it holds a taunt for the one it's after (Time.time; 0: none. TwinsVoices)
+        internal float m_tauntHeld;
         private VisEquipment m_equipment;
         private ZSyncAnimation m_animation;
         private int m_level;
@@ -99,6 +102,23 @@ namespace NhxMagicWeapons.Bosses
         // Its answer to a clean staff's draw, on its way: when its rune strikes, and where (RPC_Punish, Arrive)
         private float m_answerAt;
         private Vector3 m_answerPoint;
+
+        // On its owner's game: when a living player was last known in its fight (Present; TwinsRules.CheckAbandoned).
+        // Not yet: this game has only just begun to run it
+        private float m_presentAt = -1f;
+
+        // A living player is in its fight: their own game says so (PresentRpc, from TwinsDuel), or this one sees them
+        internal void Present() => m_presentAt = Time.time;
+
+        // How long since one was (seconds), counted from now if this game hasn't known of any yet
+        internal float SincePresent()
+        {
+            if (m_presentAt < 0f)
+            {
+                m_presentAt = Time.time;
+            }
+            return Time.time - m_presentAt;
+        }
 
         // Its rune is out for a clean staff's draw: it starts no attack until it has struck (TwinsAI), so it's free to
         // land on it
@@ -175,7 +195,9 @@ namespace NhxMagicWeapons.Bosses
             {
                 m_nview.Register<ZDOID, bool>(PunishRpc, RPC_Punish);
                 m_nview.Register<Vector3>(WardRpc, RPC_Ward);
+                m_nview.Register(PresentRpc, sender => Present());
                 TwinsBond.Register(this);
+                TwinsVoices.Register(this);
             }
         }
 
@@ -233,7 +255,9 @@ namespace NhxMagicWeapons.Bosses
             {
                 m_role = Role.None;
                 m_target = null;
+                m_tauntHeld = 0f;
                 m_answerAt = 0f;
+                m_presentAt = -1f;
                 return;
             }
             if (m_answerAt > 0f && Time.time >= m_answerAt)
@@ -320,9 +344,16 @@ namespace NhxMagicWeapons.Bosses
                 return;
             }
             m_roleTimer = 0f;
+            // A taunt it held for someone else goes unsaid: this player has its staff now, and it turns to them as soon
+            // as their draw reaches this game, a moment after this call does (TwinsVoices)
+            if (player != m_target)
+            {
+                m_tauntHeld = 0f;
+            }
             if (!clean)
             {
                 TwinsLog.Event($"{TwinsLog.Name(this)} punishes {TwinsLog.Name(player)}'s swap to a staff still charged: a smite of {TwinsDuel.SwapDamage:0}, then a rush.");
+                TwinsVoices.Impatient(this, player);
                 TwinsDuel.Smite(Element, player, m_humanoid, TwinsDuel.SwapDamage, TwinsDuel.SmiteRadius);
                 Rush(player.transform.position, ArriveGap, TwinsLog.Name(player));
                 m_nextRush = Time.time + RushCooldown;
@@ -436,12 +467,12 @@ namespace NhxMagicWeapons.Bosses
         // ground, as Lightning Step goes; but where something's in the way (rocks, a tree), it doesn't stop there: it
         // flashes over it to a free spot near where it meant to land (the user, 2026-11-15: debris "prevented the bosses
         // from teleporting next to me"). False: nowhere to go. The rush's, and the Firecaller's comet in its second phase
-        // (TwinsPhase)
+        // (TwinsPhase). An arena's twin lands within its ring (TwinsRing: the walk ends at the edge, and so does the aim)
         internal bool Flash(Vector3 dir, float reach, out Vector3 from, out Vector3 to)
         {
             Vector3 start = transform.position;
             from = to = m_humanoid.GetCenterPoint();
-            Vector3 aim = start + dir * reach;
+            Vector3 aim = TwinsRing.Clamp(m_humanoid, start + dir * reach);
             bool walked = LightningStep.Walk(m_humanoid, start, dir, reach, out Vector3 end);
             if (!walked || Utils.DistanceXZ(end, aim) > ShortOfAim)
             {
@@ -488,7 +519,8 @@ namespace NhxMagicWeapons.Bosses
                 for (int i = 0; i < spots; i++)
                 {
                     Vector3 point = aim + Quaternion.AngleAxis(360f * i / spots, Vector3.up) * Vector3.forward * (StandStep * ring);
-                    if (!ZoneSystem.instance || !ZoneSystem.instance.GetGroundHeight(point, out float ground) || ground < water - 0.5f)
+                    if (!ZoneSystem.instance || !ZoneSystem.instance.GetGroundHeight(point, out float ground) || ground < water - 0.5f
+                        || TwinsRing.Stops(m_humanoid, point))
                     {
                         continue;
                     }

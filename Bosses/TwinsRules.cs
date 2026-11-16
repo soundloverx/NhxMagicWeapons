@@ -12,12 +12,18 @@ namespace NhxMagicWeapons.Bosses
     //   the storm, Lightning Step, the comet); burning goes past this (SE_Burning applies its damage itself), as it
     //   should, the staves' fire burning on. devcommands' killall (one hit of 10^10, from no one) still kills them
     // - A fight left is lost (the user: "Can the bosses just despawn and require re-summon instead of just healing?"): with
-    //   no living player in the fight (TwinsAI.InReach) for Abandon seconds, the twins go, each in a flash of its rune. The
-    //   last time someone was there is in each one's ZDO (SeenKey), so a fight left behind (everyone portalled away, the
-    //   area unloaded) ends as the twins load again: on every game that loads them, before anything of the fight
-    //   happens (LeftBehind, from CallerBoss.Awake). At first that was only the owner's half-second check, which found
-    //   the player back already (a portal by the arena) and let the fight go on; the user, 2026-11-15: "they should
-    //   despawn if possible, before any other abilities are used or anything else - no voice lines, nothing"
+    //   no living player in the fight (TwinsRing.Inside) for Abandon seconds, the twins go, each in a flash of its rune.
+    //   Abandon was 30 s; the redesign (agreed with the user 2026-11-15, its change 5) makes it 5: "The twins withdraw
+    //   5 s after no living player is left in the ring, solo and in co-op alike", so alone a death is a wipe (no
+    //   respawning and coming back to twins still hurt), and together the fight goes on while anyone lives. Who's
+    //   there: each player's own game says so while its player lives in the fight (TwinsDuel: CallerBoss.PresentRpc,
+    //   every second), and the twin's game looks too (AnyoneInside): one alone would miss a player too far across the
+    //   ring for the twin's game to have loaded, or one whose game stalls. The last time someone was there is in each
+    //   one's ZDO (SeenKey), so a fight left behind (a crash, everyone gone, the area unloaded) ends as the twins load
+    //   again: on every game that loads them, before anything of the fight happens (LeftBehind, from
+    //   CallerBoss.Awake). At first that was only the owner's half-second check, which found the player back already (a
+    //   portal by the arena) and let the fight go on; the user, 2026-11-15: "they should despawn if possible, before
+    //   any other abilities are used or anything else - no voice lines, nothing"
     // And of the fight's redesign (agreed with the user, 2026-11-15, its change 1):
     // - A staff cannot hurt its own caller: a hit from a player holding the Staff of Storms on the Stormcaller, or the
     //   Wrath of Muspelheim on the Firecaller, is refused whole (StavesOnly), so a staff swap is a target swap: the twin
@@ -28,9 +34,9 @@ namespace NhxMagicWeapons.Bosses
     //   it alone (Immune, asked by Staves\StaffHits.Seeks)
     internal static class TwinsRules
     {
-        private const float Abandon = 30f;
+        private const float Abandon = 5f;
         // How often the time someone was there is written (seconds)
-        private const float SeenEvery = 2f;
+        private const float SeenEvery = 1f;
         private const float VanishRadius = 3f;
         private const float CheatKill = 1e9f;
 
@@ -46,7 +52,13 @@ namespace NhxMagicWeapons.Bosses
             ZDO zdo = boss.m_nview.GetZDO();
             long seen = zdo.GetLong(s_seenKey);
             long now = Now;
-            if (seen == 0L || AnyoneNear(boss))
+            if (AnyoneInside(boss))
+            {
+                boss.Present();
+            }
+            // A twin just made, or just taken over by this game (which hasn't heard its players yet), has the whole time
+            float since = boss.SincePresent();
+            if (seen == 0L || since < SeenEvery)
             {
                 if (now - seen > System.TimeSpan.FromSeconds(SeenEvery).Ticks)
                 {
@@ -54,7 +66,7 @@ namespace NhxMagicWeapons.Bosses
                 }
                 return false;
             }
-            if (now - seen < System.TimeSpan.FromSeconds(Abandon).Ticks)
+            if (since < Abandon)
             {
                 return false;
             }
@@ -69,11 +81,12 @@ namespace NhxMagicWeapons.Bosses
             return seen != 0L && Now - seen >= System.TimeSpan.FromSeconds(Abandon).Ticks;
         }
 
-        private static bool AnyoneNear(CallerBoss boss)
+        // A living player in this twin's fight, as this game sees them
+        private static bool AnyoneInside(CallerBoss boss)
         {
             foreach (Player player in Player.GetAllPlayers())
             {
-                if (player && !player.IsDead() && TwinsAI.InReach(boss, player))
+                if (player && !player.IsDead() && TwinsRing.Inside(boss, player.transform.position))
                 {
                     return true;
                 }
@@ -113,8 +126,8 @@ namespace NhxMagicWeapons.Bosses
             return twin && attacker is Player player && StaffOf(player) == twin.Element;
         }
 
-        // A twin's hits, on its owner's game, before anything is taken. An altar's twins only take them from inside its
-        // ring (the arena: no sniping from beyond the stones, where their spells don't reach)
+        // A twin's hits, on its owner's game, before anything is taken. Only from a player in its fight (TwinsRing.Inside:
+        // an altar's twins', inside its ring; no sniping from beyond the stones, where their spells don't reach)
         [HarmonyPatch(typeof(Character), "RPC_Damage")]
         private static class StavesOnly
         {
@@ -144,7 +157,7 @@ namespace NhxMagicWeapons.Bosses
                     TwinsLog.Refuse(__instance, "entering its second phase");
                     return false;
                 }
-                if (TwinsBond.Arena(twin, out Vector3 arena) && Utils.DistanceXZ(player.transform.position, arena) > TwinsAltars.ArenaRadius + ArenaGrace)
+                if (twin && !TwinsRing.Inside(twin, player.transform.position))
                 {
                     TwinsLog.Refuse(__instance, "from outside the ring");
                     return false;
@@ -160,8 +173,5 @@ namespace NhxMagicWeapons.Bosses
                 return true;
             }
         }
-
-        // A player at the ring's very edge still counts as inside (meters)
-        internal const float ArenaGrace = 2f;
     }
 }

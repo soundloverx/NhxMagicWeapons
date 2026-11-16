@@ -1,3 +1,4 @@
+using HarmonyLib;
 using NhxMagicWeapons.Staves.StaffOfStorms;
 using NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects;
 using UnityEngine;
@@ -15,7 +16,11 @@ namespace NhxMagicWeapons.Bosses
     // happens. Still held after Warning seconds: judged, for good. Their ZDO says so (JudgedKey), and the twins turn to them
     // and stand, channelling (TwinsAI: Role.Judging); their game draws both beams from the twins' hands (the Staff of
     // Storms' bolt, the Wrath of Muspelheim's flames, networked) and takes TickShare of their health each Tick, past
-    // armor, blocking and dodging (Character.ApplyDamage), until they die. In god mode they don't: the game keeps them at 1
+    // armor, blocking and dodging (Character.ApplyDamage), until they die. In god mode they don't: the game keeps them at 1.
+    // And in the fight, an attack or a cast with anything but the two staves isn't begun (NoOtherAttack; the fight's
+    // redesign, agreed with the user 2026-11-15, its change 6: "A forbidden item does nothing in the ring"), so there's
+    // nothing to gain within the warning, and a misclick costs nothing but the time left to put the thing away. Until
+    // the redesign, leaving the ring after having been in it was judged too; the ring holds now (TwinsRing)
     internal static class TwinsJudgment
     {
         private const float Warning = 3f;
@@ -31,10 +36,6 @@ namespace NhxMagicWeapons.Bosses
         private static bool s_judged;
         private static float s_tickTimer;
         private static float s_beamTimer;
-        // Whether the player has been inside the twins' arena (an altar's ring) in this fight: leaving it then is judged
-        // as a forbidden weapon is (Claude's suggestion, 2026-11-14, taken with the altar: "the rune around the arena
-        // [...] would solve everything"); coming in from outside isn't (a player back from the dead walks in freely)
-        private static bool s_entered;
 
         // Judged: until death, wherever they go (TwinsDuel keeps them in the fight)
         internal static bool Judged => s_judged;
@@ -54,8 +55,7 @@ namespace NhxMagicWeapons.Bosses
                 Sentence(player, dt);
                 return;
             }
-            bool fled = Fled(player);
-            if (!fled && !Forbidden(player))
+            if (!Forbidden(player))
             {
                 s_warning = -1f;
                 return;
@@ -63,8 +63,8 @@ namespace NhxMagicWeapons.Bosses
             if (s_warning < 0f)
             {
                 s_warning = Warning;
-                player.Message(MessageHud.MessageType.Center, fled ? "$msg_nhx_arena_warning" : "$msg_nhx_judgment_warning");
-                TwinsLog.Event($"{TwinsLog.Name(player)} is warned: {(fled ? "out of the ring" : "holding " + Held(player))}.");
+                player.Message(MessageHud.MessageType.Center, "$msg_nhx_judgment_warning");
+                TwinsLog.Event($"{TwinsLog.Name(player)} is warned: holding {Held(player)}.");
             }
             s_warning -= dt;
             if (s_warning > 0f)
@@ -76,7 +76,8 @@ namespace NhxMagicWeapons.Bosses
             s_beamTimer = 0f;
             player.m_nview.GetZDO().Set(JudgedKey, true);
             player.Message(MessageHud.MessageType.Center, "$msg_nhx_judged");
-            TwinsLog.Event($"{TwinsLog.Name(player)} is judged{(fled ? " (out of the ring)" : ", holding " + Held(player))}.");
+            TwinsLog.Event($"{TwinsLog.Name(player)} is judged, holding {Held(player)}.");
+            TwinsVoices.Say(TwinsVoices.Judgment, player.transform.position, $"{TwinsLog.Name(player)} is judged");
             foreach (Player other in Player.GetAllPlayers())
             {
                 if (other && other != player && Vector3.Distance(other.transform.position, player.transform.position) <= TwinsBond.TellRange)
@@ -86,27 +87,31 @@ namespace NhxMagicWeapons.Bosses
             }
         }
 
-        // Out of the arena of the nearest twins after having been in it
-        private static bool Fled(Player player)
+        // In the fight, the local player begins no attack but the staves': not another weapon's or tool's, not a bow's,
+        // not a bomb's, not their fists'. Blocking is left alone (a shield in hand is judged like the rest)
+        [HarmonyPatch(typeof(Humanoid), nameof(Humanoid.StartAttack))]
+        private static class NoOtherAttack
         {
-            CallerBoss.NearestLiving(player.transform.position, Element.None, out CallerBoss twin);
-            if (!TwinsBond.Arena(twin, out Vector3 arena))
+            private static bool Prefix(Humanoid __instance, ref bool __result)
             {
+                if (!TwinsDuel.InFight || __instance != Player.m_localPlayer)
+                {
+                    return true;
+                }
+                ItemDrop.ItemData weapon = __instance.GetCurrentWeapon();
+                if (weapon == null || TwinsDuel.ElementOf(weapon) != Element.None)
+                {
+                    return true;
+                }
+                __result = false;
                 return false;
             }
-            bool inside = Utils.DistanceXZ(player.transform.position, arena) <= TwinsAltars.ArenaRadius + TwinsRules.ArenaGrace;
-            if (inside)
-            {
-                s_entered = true;
-            }
-            return s_entered && !inside;
         }
 
         internal static void Reset(Player player)
         {
             s_warning = -1f;
             s_judged = false;
-            s_entered = false;
             if (player && player.m_nview && player.m_nview.IsValid())
             {
                 player.m_nview.GetZDO().Set(JudgedKey, false);

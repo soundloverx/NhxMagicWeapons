@@ -165,7 +165,6 @@ namespace NhxMagicWeapons.Bosses
             if (monsterView)
             {
                 nview.m_persistent = monsterView.m_persistent;
-                nview.m_distant = monsterView.m_distant;
                 nview.m_type = monsterView.m_type;
                 nview.m_syncInitialScale = monsterView.m_syncInitialScale;
             }
@@ -173,6 +172,12 @@ namespace NhxMagicWeapons.Bosses
             {
                 nview.m_persistent = true;
             }
+            // Loaded as far as the game loads anything (its distant objects: the simulation distance's far zones too), not
+            // only within its near zones as monsters are: the ring is 80 m across, and at the smallest simulation
+            // distance a twin at one edge could be gone from the game of a player at the other, which would then count
+            // that player out of the fight (TwinsRing asks the twins on its game), free of the ring's hold and of its
+            // charges. The game that runs it is still one that has it near
+            nview.m_distant = true;
             ZSyncTransform sync = boss.GetComponent<ZSyncTransform>();
             ZSyncTransform monsterSync = monster ? monster.GetComponent<ZSyncTransform>() : null;
             if (sync && monsterSync)

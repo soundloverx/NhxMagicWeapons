@@ -25,7 +25,10 @@ namespace NhxMagicWeapons.Bosses
     //   with a rune and flames in its hands (CometWindup, standing), then comets through where they stood, CometPast
     //   beyond, hitting whoever is on the way, and the way burns for TrailTime, hurting whoever stands in it
     // - Alone with one player, the twin that watches (TwinsAI) casts its phase's spell at them in place of its own; the
-    //   hunter, with no one else, has no one to cast it at. No faster: their speeds and other attacks are as before.
+    //   hunter, with no one else, has no one to cast it at. A watching Firecaller comets every WatcherCometInterval (the
+    //   user, 2026-11-16: "When firecaller is watching, let it use the comet more often, with just a 7 seconds
+    //   cooldown"): its role as the comet comes due decides, so a watcher that starts hunting waits out CometInterval
+    //   from its last. No faster: their speeds and other attacks are as before.
     // - Its twin fallen (the fight's redesign, agreed with the user 2026-11-15, its change 7): its second phase comes at
     //   once, whatever its health (TwinFell), and it goes on casting its spell while it hunts alone: at another player
     //   in the fight, or with no other, at its own quarry (OtherPlayer)
@@ -39,6 +42,7 @@ namespace NhxMagicWeapons.Bosses
         private const float RetryAfter = 1f;
         private const float StormInterval = 20f;
         private const float CometInterval = 14f;
+        private const float WatcherCometInterval = 7f;
         // The comet: the warning (standing, flames in its hands toward the rune, every WindupFlamesEvery), how far past the
         // mark it lands, who it hits on the way (within CometWidth of its line: fire, a roll dodges it, no block, a push),
         // and its burning way (TrailWidth either side, TrailTime)
@@ -70,8 +74,6 @@ namespace NhxMagicWeapons.Bosses
         private const float LinkShare = 0.05f;
         private const float ArcInterval = 0.25f;
         private const int ArcLevel = 12;
-        // A Stormcaller in its second phase this near joins the players
-        private const float LinkFightRadius = 80f;
 
         private static readonly int s_enragedKey = "nhx_twin_enraged".GetStableHashCode();
         private static readonly int s_enragedAtKey = "nhx_twin_enraged_at".GetStableHashCode();
@@ -88,6 +90,8 @@ namespace NhxMagicWeapons.Bosses
         private float m_flare;
         // On the owner's game
         private float m_nextSpell;
+        // When its last comet was marked: a hunter's next waits CometInterval from it, a watcher's WatcherCometInterval
+        private float m_lastComet = float.NegativeInfinity;
         private float m_windup = -1f;
         private Vector3 m_aim;
         private float m_flameTimer;
@@ -271,7 +275,8 @@ namespace NhxMagicWeapons.Bosses
                 }
                 return;
             }
-            if (Time.time < m_nextSpell || m_humanoid.InAttack())
+            float interval = m_boss.m_role == CallerBoss.Role.Watcher ? WatcherCometInterval : CometInterval;
+            if (Time.time < m_nextSpell || Time.time < m_lastComet + interval || m_humanoid.InAttack())
             {
                 return;
             }
@@ -281,7 +286,7 @@ namespace NhxMagicWeapons.Bosses
                 m_nextSpell = Time.time + RetryAfter;
                 return;
             }
-            m_nextSpell = Time.time + CometInterval;
+            m_lastComet = Time.time;
             m_aim = LightningStrike.Ground(other.transform.position);
             m_windup = CometWindup;
             m_flameTimer = 0f;
@@ -338,7 +343,8 @@ namespace NhxMagicWeapons.Bosses
             Vector3 along = length > 0.01f ? path / length : dir;
             foreach (Player player in Player.GetAllPlayers())
             {
-                if (!player || player.IsDead())
+                // Those in its fight: who watches from outside the ring isn't touched (TwinsRing)
+                if (!player || player.IsDead() || !TwinsRing.Inside(m_boss, player.transform.position))
                 {
                     continue;
                 }
@@ -406,7 +412,7 @@ namespace NhxMagicWeapons.Bosses
         // A living player in this fight the elements haven't judged
         private bool Fighter(Player player)
         {
-            return player && !player.IsDead() && !Judged(player) && TwinsAI.InReach(m_boss, player);
+            return player && !player.IsDead() && !Judged(player) && TwinsRing.Inside(m_boss, player.transform.position);
         }
 
         private static bool Judged(Player player)
@@ -484,12 +490,12 @@ namespace NhxMagicWeapons.Bosses
             s_partners.Clear();
         }
 
-        // A player the Stormcaller's arcs reach: within LinkFightRadius of it, or anywhere in its arena's ring (the ring is
-        // wider than that from edge to edge; the user, 2026-11-15: "entering the ring during a fight should place the
-        // player in combat, being then affected by anything that entails")
+        // A player the Stormcaller's arcs reach: one in its fight (TwinsRing: anywhere in its arena's ring; the user,
+        // 2026-11-15: "entering the ring during a fight should place the player in combat, being then affected by
+        // anything that entails")
         private static bool InStormFight(CallerBoss storm, Player player)
         {
-            return Vector3.Distance(player.transform.position, storm.transform.position) <= LinkFightRadius || TwinsAI.InReach(storm, player);
+            return TwinsRing.Inside(storm, player.transform.position);
         }
 
         // `share` of the player's health as the element, lessened by their resistance to it; no stagger, no push

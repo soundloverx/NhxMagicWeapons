@@ -12,7 +12,7 @@ namespace NhxMagicWeapons.Bosses
     // the fallen's rune, lighting up ring by ring over the window as a countdown (ElementRune, no caster: harmless), tells
     // the players around, and when the window is out, raises its twin there at half its health (Raise). Fall within the
     // window, and nothing is raised: the fight is won (Won: the Stormhearts and Surtr's Tears). The window is RaiseDelay,
-    // or SoloDelay with one player in the fight (TwinsAI.InReach).
+    // or SoloDelay with one player in the fight (TwinsRing.Inside).
     // While its twin is down, the survivor fights alone (Alone; the fight's redesign, agreed with the user 2026-11-15, its
     // change 7): it enters its second phase at once, whatever its health (Fell: TwinsPhase.TwinFell), hunts whoever can
     // hurt it (TwinsAI), and its fallen twin's element is silent on the players (TwinsDuel.Silence).
@@ -27,7 +27,8 @@ namespace NhxMagicWeapons.Bosses
         private const float RuneRadius = 4f;
         private const float RaisedHealth = 0.5f;
         // Players this far from the twins hear what happens to them (TwinsJudgment's news too): 80 m at first, but from one
-        // edge of the ring to the other is 84 m, and anyone in the ring is in the fight (TwinsDuel.InRing)
+        // edge of the ring to the other is 84 m, and anyone in the ring is in the fight (TwinsRing). Who watches from just
+        // outside it hears them too: news, nothing more
         internal const float TellRange = 100f;
 
         private const string FellRpc = "NhxTwinFell";
@@ -145,8 +146,13 @@ namespace NhxMagicWeapons.Bosses
         // The arena's middle these twins fight in, if they were called into one (on any game, from the twin's ZDO)
         internal static bool Arena(CallerBoss boss, out Vector3 arena)
         {
+            return Arena(boss && boss.m_nview && boss.m_nview.IsValid() ? boss.m_nview.GetZDO() : null, out arena);
+        }
+
+        // The same, from a twin's ZDO (the server's, which holds them all but makes no twins: TwinsAltars)
+        internal static bool Arena(ZDO zdo, out Vector3 arena)
+        {
             arena = Vector3.zero;
-            ZDO zdo = boss && boss.m_nview && boss.m_nview.IsValid() ? boss.m_nview.GetZDO() : null;
             if (zdo == null || !zdo.GetBool(s_hasArenaKey))
             {
                 return false;
@@ -240,7 +246,7 @@ namespace NhxMagicWeapons.Bosses
             int players = 0;
             foreach (Player player in Player.GetAllPlayers())
             {
-                if (player && !player.IsDead() && TwinsAI.InReach(boss, player))
+                if (player && !player.IsDead() && TwinsRing.Inside(boss, player.transform.position))
                 {
                     players++;
                 }

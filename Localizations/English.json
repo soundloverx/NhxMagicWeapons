@@ -54,11 +54,10 @@
   "msg_nhx_twin_rises_storm": "The Stormcaller rises again!",
   "msg_nhx_twin_rises_fire": "The Firecaller rises again!",
   "msg_nhx_twins_vanquished": "The elements are appeased.",
-  "msg_nhx_twins_withdraw": "The elements withdraw. Their twins are gone.",
+  "msg_nhx_twins_withdraw": "The twin elementals withdraw.",
   "msg_nhx_judgment_warning": "The elements are watching. Wield only their gifts.",
   "msg_nhx_judged": "The elements have judged you and found you wanting.",
   "msg_nhx_judged_other": "has been deemed unworthy by the elements.",
-  "msg_nhx_arena_warning": "Return to the circle! The elements are watching.",
   "item_nhx_stormheart": "Stormheart",
   "item_nhx_stormheart_description": "The Stormcaller's heart, still humming with the storm that filled its empty robes. Stormcaller's Raiment is woven around one.",
   "item_nhx_surtrstear": "Surtr's Tear",
@@ -69,6 +68,7 @@
   "msg_nhx_lodestone_none": "The lodestone stays still: no altar of the elements answers.",
   "piece_nhx_twins_altar": "Altar of the Elements",
   "piece_nhx_twins_offer": "Offer",
+  "piece_nhx_twins_warning": "Once the twins answer, the ring holds everyone within it until the fight ends.\nThe fight needs both staves: the Staff of Storms and the Wrath of Muspelheim.",
   "msg_nhx_altar_offer": "Offer a Lodestone of the Elements to call the twins.",
   "msg_nhx_altar_busy": "The twins are already here."
 }

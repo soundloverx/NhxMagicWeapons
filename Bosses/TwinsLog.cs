@@ -33,8 +33,6 @@ namespace NhxMagicWeapons.Bosses
     internal static class TwinsLog
     {
         private const float FlushEvery = 5f;
-        // The local player's hits are logged this near a living twin (TwinsDuel's leave radius)
-        private const float PlayerRange = 80f;
 
         private static bool On => Plugin.TwinsFightLog != null && Plugin.TwinsFightLog.Value;
 
@@ -151,9 +149,7 @@ namespace NhxMagicWeapons.Bosses
             {
                 return true;
             }
-            return character == Player.m_localPlayer
-                && (CallerBoss.NearestLiving(character.transform.position, Element.None, out _) <= PlayerRange
-                    || TwinsDuel.InRing(character.transform.position));
+            return character == Player.m_localPlayer && (TwinsDuel.InFight || TwinsRing.Fight(character.transform.position, out _));
         }
 
         // A twin's rules refused the hit being taken (TwinsRules)

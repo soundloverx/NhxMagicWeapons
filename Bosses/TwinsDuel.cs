@@ -14,11 +14,13 @@ namespace NhxMagicWeapons.Bosses
     }
 
     // The twins' fight's core, as the user decided it (2026-11-14), on each player's own game for its player:
-    // - The fight: from coming within EngageRadius of a living twin, or into the ring of an arena whose twins live, to
-    //   being farther than LeaveRadius from both and out of the ring (or dying). As the twins count it (TwinsAI.InReach):
-    //   at first the ring didn't count here, so a player in it but far from both twins was hunted with nothing building
-    //   on them; the user, 2026-11-15: "entering the ring during a fight should place the player in combat, being then
-    //   affected by anything that entails"
+    // - The fight: while the player is alive inside the ring of an arena whose twins live, and only then (TwinsRing.Fight,
+    //   the one test everything asks: the fight's redesign, agreed with the user 2026-11-15, its change 4). The ring
+    //   holds them in it (TwinsRing.HoldPlayer), so it ends with the twins' deaths, their own, or the twins
+    //   withdrawing; while it lasts their game tells the twins they're there (Present), and when no one has for 5 s,
+    //   the twins withdraw (TwinsRules). Before the redesign: from within 50 m of a twin, or in the ring ("entering the
+    //   ring during a fight should place the player in combat, being then affected by anything that entails", the user,
+    //   2026-11-15), to 80 m from both and out of the ring, with a judgment for who left the ring
     // - A staff drawn: the element of the last of the two staves the player took in hand. Putting it away, drinking,
     //   eating, changes nothing ("The swap is whenever the other staff is equipped, not when the current one is
     //   unequipped or the player drinks a health potion"); drawing the other one is a swap. Kept in the player's ZDO with
@@ -51,8 +53,8 @@ namespace NhxMagicWeapons.Bosses
     //   again from none. The survivor's own element is as ever
     internal static class TwinsDuel
     {
-        internal const float EngageRadius = 50f;
-        private const float LeaveRadius = 80f;
+        // How often the player's game tells the twins of their fight that they're in it, alive (seconds)
+        private const float PresentEvery = 1f;
         private const float StackInterval = 5f;
         internal const int MaxStacks = 5;
         // Once the other staff is drawn, a charge drains to nothing over this long, from whatever it was (seconds)
@@ -89,7 +91,11 @@ namespace NhxMagicWeapons.Bosses
         internal static GameObject s_fireRune;
 
         private static bool s_inFight;
+        private static float s_presentTimer;
         private static Element s_drawn;
+
+        // Whether the local player is in the twins' fight (TwinsJudgment: no attack there but the staves'; TwinsLog)
+        internal static bool InFight => s_inFight;
         // The element whose twin has fallen, if one has: silent (Silence)
         private static Element s_silent;
         // Each element's charge on the player, in stacks (by Element): building evenly while its staff is the last drawn,
@@ -175,29 +181,35 @@ namespace NhxMagicWeapons.Bosses
                 }
                 return;
             }
-            float nearest = CallerBoss.NearestLiving(player.transform.position, Element.None, out _);
-            bool inRing = InRing(player.transform.position);
+            Vector3 position = player.transform.position;
+            bool inside = TwinsRing.Fight(position, out CallerBoss twin);
+            bool ring = TwinsBond.Arena(twin, out Vector3 arena);
             if (!s_inFight)
             {
-                if (nearest > EngageRadius && !inRing)
+                if (!inside)
                 {
                     return;
                 }
                 s_inFight = true;
+                s_presentTimer = 0f;
                 s_silent = Element.None;
                 System.Array.Clear(s_charge, 0, s_charge.Length);
                 System.Array.Clear(s_drain, 0, s_drain.Length);
                 SetDrawn(player, Element.None);
                 StartStats(player);
-                TwinsLog.Event($"{TwinsLog.Name(player)} joins the fight ({nearest:0} m from the nearest twin{(inRing ? ", inside the ring" : "")}).");
+                TwinsLog.Event($"{TwinsLog.Name(player)} joins the fight ({(ring ? "inside the ring" : "by twins with no arena")}, "
+                    + $"{Vector3.Distance(position, twin.transform.position):0} m from the nearest twin).");
             }
-            // A judged player stays in it until they die, however far they run (while the twins live); anyone in the ring
-            // stays in it, however far the twins are (the ring is wider than LeaveRadius from edge to edge)
-            else if (nearest > LeaveRadius && !inRing && (!TwinsJudgment.Judged || float.IsInfinity(nearest)))
+            // Out of it (the ring holds, so: the twins gone, or twins with no arena left behind, or a cheat). A judged
+            // player stays in it until they die, wherever they are (while a twin lives)
+            else if (!inside && (!TwinsJudgment.Judged || float.IsInfinity(CallerBoss.NearestLiving(position, Element.None, out _))))
             {
                 Leave(player);
                 return;
             }
+            // The ring holds them, and the twins of their fight know they're there
+            TwinsRing.HoldPlayer(inside && ring, arena);
+            Present(position, dt);
             s_fightTime += dt;
             s_timeWith[(int)s_drawn] += dt;
 
@@ -301,19 +313,23 @@ namespace NhxMagicWeapons.Bosses
             }
         }
 
-        // Whether `point` is within the ring of an arena whose twins live (an altar's: TwinsBond.Arena), its edge's grace
-        // included, as the twins count it (TwinsAI.InReach)
-        internal static bool InRing(Vector3 point)
+        // Every PresentEvery: each living twin whose fight the player is in hears of it, on the game that runs it
+        // (CallerBoss.PresentRpc), which sends the twins away when no one has said so for a while (TwinsRules)
+        private static void Present(Vector3 position, float dt)
         {
+            s_presentTimer -= dt;
+            if (s_presentTimer > 0f)
+            {
+                return;
+            }
+            s_presentTimer = PresentEvery;
             foreach (CallerBoss boss in CallerBoss.All)
             {
-                if (boss && boss.m_humanoid && !boss.m_humanoid.IsDead() && TwinsBond.Arena(boss, out Vector3 arena)
-                    && Utils.DistanceXZ(point, arena) <= TwinsAltars.ArenaRadius + TwinsRules.ArenaGrace)
+                if (boss && boss.m_humanoid && !boss.m_humanoid.IsDead() && boss.m_nview && boss.m_nview.IsValid() && TwinsRing.Inside(boss, position))
                 {
-                    return true;
+                    boss.m_nview.InvokeRPC(CallerBoss.PresentRpc);
                 }
             }
-            return false;
         }
 
         // Whether `element` is silent: its twin fallen (or never there), the other's fighting on alone (TwinsBond.Alone,
@@ -606,6 +622,7 @@ namespace NhxMagicWeapons.Bosses
             TwinsLog.Event($"{(player ? TwinsLog.Name(player) : s_playerName)} leaves the fight{(player && player.IsDead() ? " (dead)" : "")}.");
             Summarize();
             s_inFight = false;
+            TwinsRing.HoldPlayer(false, Vector3.zero);
             s_silent = Element.None;
             System.Array.Clear(s_charge, 0, s_charge.Length);
             System.Array.Clear(s_drain, 0, s_drain.Length);
