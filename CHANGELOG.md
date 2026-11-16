@@ -1,9 +1,7 @@
 # Changelog
 
 ## v2.0.0
-- Added the Stormcaller and the Firecaller, twin bosses called at their altars in the Ashlands by offering a Lodestone of the Elements (made at the Galdr Table; used from the inventory, it pins the nearest altar on the map). Beaten together, they drop 4 Stormhearts and 4 Surtr's Tears
-- Each piece of Stormcaller's Raiment now needs a Stormheart to craft, and each piece of the Firecaller's Regalia a Surtr's Tear
-- The staves' hits only lower their element's resistance with the matching armor set on
+- Added the Stormcaller and the Firecaller, twin bosses called at their altars in the Ashlands by offering a Lodestone of the Elements
 
 ## v1.2.0
 - Visual improvements to the staves and armors

@@ -138,6 +138,7 @@
     <Compile Include="Bosses\SmiteWeakness.cs" />
     <Compile Include="Bosses\ElementRune.cs" />
     <Compile Include="Bosses\Looks.cs" />
+    <Compile Include="Bosses\PhaseRunes.cs" />
     <Compile Include="Bosses\Showroom.cs" />
     <Compile Include="Bosses\TwinsAltars.cs" />
     <Compile Include="Bosses\TwinsItems.cs" />
@@ -147,10 +148,13 @@
     <Compile Include="Bosses\TwinsJudgment.cs" />
     <Compile Include="Bosses\TwinsMusic.cs" />
     <Compile Include="Bosses\TwinsPhase.cs" />
+    <Compile Include="Bosses\RingLook.cs" />
+    <Compile Include="Bosses\TwinsRing.cs" />
     <Compile Include="Bosses\TwinsRules.cs" />
     <Compile Include="Bosses\TwinsStasis.cs" />
     <Compile Include="Bosses\TwinsStorm.cs" />
     <Compile Include="Bosses\TwinsVoices.cs" />
+    <Compile Include="Bosses\WardFlash.cs" />
     <Compile Include="Bosses\TwinsLog.cs" />
     <Compile Include="Bosses\EmbeddedAudio.cs" />
     <Compile Include="ItemLevelCommand.cs" />

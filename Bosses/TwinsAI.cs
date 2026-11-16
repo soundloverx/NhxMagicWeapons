@@ -5,7 +5,7 @@ using UnityEngine;
 namespace NhxMagicWeapons.Bosses
 {
     // Whom each twin goes after, and how, on the game that runs it (CallerBoss, every half second), from the players in its
-    // fight (InReach: within TwinsDuel.EngageRadius, or in its arena) and what each last drew (their ZDOs: TwinsDuel):
+    // fight (TwinsRing.Inside: in its arena's ring) and what each last drew (their ZDOs: TwinsDuel):
     // - Hunter of the player who drew its staff last (the user, 2026-11-14: "Most recent draw"; the swap's twin "proceed[s]
     //   to following them")
     // - Nobody holds its staff, two players or more: hunting with its twin, on its twin's quarry (both on the one player
@@ -13,6 +13,10 @@ namespace NhxMagicWeapons.Bosses
     // - Nobody holds its staff, one player: a watcher (the user: "Yes, I like the watcher"): it keeps back, casting only its
     //   telegraphed spell (BossAttacks.IsWatcherSpell) and half again as rarely; between spells it stands and watches its
     //   player (no wandering about: IdleMovement)
+    // - Its twin fallen (TwinsBond.Alone): always a hunter, of whoever drew the fallen twin's staff last, the player who
+    //   can hurt it (a staff cannot hurt its own caller: TwinsRules); with no such player, of who drew its own, or the
+    //   nearest. The fight's redesign, agreed with the user 2026-11-15: alone with one player, the only staff that hurts
+    //   the survivor is the fallen twin's, so by the rules above it would have stood and watched to the end
     // Its AI goes after that target (UpdateTarget); the attacks, moves and the rest are the game's
     internal static class TwinsAI
     {
@@ -24,27 +28,12 @@ namespace NhxMagicWeapons.Bosses
         private static readonly System.Action<BaseAI, bool> s_setAlerted =
             AccessTools.MethodDelegate<System.Action<BaseAI, bool>>(AccessTools.Method(typeof(BaseAI), "SetAlerted"));
 
-        // Whether `player` is in this twin's fight: within TwinsDuel.EngageRadius of it, or anywhere in its arena (the
-        // ring is 80 m across: a twin at one edge counted a player at the other out, and wandered off, or vanished as if
-        // the fight were left; the user, 2026-11-15: "I saw the firecaller just roam around aimlessly when it should have
-        // been chasing me")
-        internal static bool InReach(CallerBoss boss, Player player)
-        {
-            if (!boss || !player)
-            {
-                return false;
-            }
-            Vector3 position = player.transform.position;
-            return Vector3.Distance(position, boss.transform.position) <= TwinsDuel.EngageRadius
-                || (TwinsBond.Arena(boss, out Vector3 arena) && Utils.DistanceXZ(position, arena) <= TwinsAltars.ArenaRadius + TwinsRules.ArenaGrace);
-        }
-
         internal static void UpdateRole(CallerBoss boss)
         {
             s_fighters.Clear();
             foreach (Player player in Player.GetAllPlayers())
             {
-                if (player && !player.IsDead() && InReach(boss, player))
+                if (player && !player.IsDead() && TwinsRing.Inside(boss, player.transform.position))
                 {
                     s_fighters.Add(player);
                 }
@@ -62,7 +51,13 @@ namespace NhxMagicWeapons.Bosses
             else if (s_fighters.Count > 0)
             {
                 Player mine = LatestDrawer(boss.Element);
-                if (mine)
+                if (TwinsBond.Alone(boss))
+                {
+                    Player bane = LatestDrawer(TwinsDuel.Other(boss.Element));
+                    role = CallerBoss.Role.Hunter;
+                    target = bane ? bane : mine ? mine : Nearest(boss);
+                }
+                else if (mine)
                 {
                     role = CallerBoss.Role.Hunter;
                     target = mine;
@@ -92,6 +87,11 @@ namespace NhxMagicWeapons.Bosses
             if (target is Player turnedTo && (target != before || (role == CallerBoss.Role.Hunter && roleBefore != CallerBoss.Role.Hunter)))
             {
                 TwinsVoices.Targeted(boss, turnedTo);
+            }
+            // Or what it has waited to say to the one it's after: the taunt its turn was too early for, the pair's first
+            else
+            {
+                TwinsVoices.Pending(boss);
             }
 
             // Each puts away what its role can't use, or its AI would go on with it (MonsterAI attacks with what's in hand)
@@ -145,6 +145,23 @@ namespace NhxMagicWeapons.Bosses
             return latest;
         }
 
+        // Among s_fighters, the nearest to this twin
+        private static Player Nearest(CallerBoss boss)
+        {
+            Player nearest = null;
+            float best = float.PositiveInfinity;
+            foreach (Player player in s_fighters)
+            {
+                float distance = Vector3.Distance(player.transform.position, boss.transform.position);
+                if (distance < best)
+                {
+                    best = distance;
+                    nearest = player;
+                }
+            }
+            return nearest;
+        }
+
         // In its second phase (TwinsPhase), where a watcher casts its phase's spell in place of its own
         private static bool Enraged(CallerBoss boss) => boss.m_phase && boss.m_phase.Enraged;
 
@@ -174,11 +191,13 @@ namespace NhxMagicWeapons.Bosses
                 }
             }
 
-            // Only players: with no target of its own, the AI would pick the nearest enemy, and a tame is one (held in the
-            // arena, it can't be hurt: the twin stood by it)
+            // Only players in its fight: with no target of its own, the AI would pick the nearest enemy, and a tame is one
+            // (held in the arena, it can't be hurt: the twin stood by it), or a player watching from outside the ring
             private static void Postfix(MonsterAI __instance, ref bool canHearTarget, ref bool canSeeTarget)
             {
-                if (__instance.m_targetCreature && !(__instance.m_targetCreature is Player) && CallerBoss.ByAI.ContainsKey(__instance))
+                Character picked = __instance.m_targetCreature;
+                if (picked && CallerBoss.ByAI.TryGetValue(__instance, out CallerBoss boss)
+                    && (!(picked is Player) || !TwinsRing.Inside(boss, picked.transform.position)))
                 {
                     __instance.m_targetCreature = null;
                     canHearTarget = false;
@@ -217,6 +236,13 @@ namespace NhxMagicWeapons.Bosses
                 }
                 // Standing for its phase's coming or its comet's warning: nothing else (TwinsPhase)
                 if (boss.m_phase && boss.m_phase.Busy(out _))
+                {
+                    __result = false;
+                    return;
+                }
+                // Its rune is out for a clean staff's draw: nothing new until it has struck, so it can land on it
+                // (CallerBoss.Arrive)
+                if (boss.Answering)
                 {
                     __result = false;
                     return;

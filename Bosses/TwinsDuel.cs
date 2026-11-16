@@ -14,11 +14,13 @@ namespace NhxMagicWeapons.Bosses
     }
 
     // The twins' fight's core, as the user decided it (2026-11-14), on each player's own game for its player:
-    // - The fight: from coming within EngageRadius of a living twin, or into the ring of an arena whose twins live, to
-    //   being farther than LeaveRadius from both and out of the ring (or dying). As the twins count it (TwinsAI.InReach):
-    //   at first the ring didn't count here, so a player in it but far from both twins was hunted with nothing building
-    //   on them; the user, 2026-11-15: "entering the ring during a fight should place the player in combat, being then
-    //   affected by anything that entails"
+    // - The fight: while the player is alive inside the ring of an arena whose twins live, and only then (TwinsRing.Fight,
+    //   the one test everything asks: the fight's redesign, agreed with the user 2026-11-15, its change 4). The ring
+    //   holds them in it (TwinsRing.HoldPlayer), so it ends with the twins' deaths, their own, or the twins
+    //   withdrawing; while it lasts their game tells the twins they're there (Present), and when no one has for 5 s,
+    //   the twins withdraw (TwinsRules). Before the redesign: from within 50 m of a twin, or in the ring ("entering the
+    //   ring during a fight should place the player in combat, being then affected by anything that entails", the user,
+    //   2026-11-15), to 80 m from both and out of the ring, with a judgment for who left the ring
     // - A staff drawn: the element of the last of the two staves the player took in hand. Putting it away, drinking,
     //   eating, changes nothing ("The swap is whenever the other staff is equipped, not when the current one is
     //   unequipped or the player drinks a health potion"); drawing the other one is a swap. Kept in the player's ZDO with
@@ -32,22 +34,37 @@ namespace NhxMagicWeapons.Bosses
     //   OverloadGrowth times harder than the last (Claude's proposal, 2026-11-14, taken by the user), and leaves them a
     //   step weaker to the element for a minute (SmiteWeakness: Stormstruck, Flamestruck; the user, 2026-11-15), which a
     //   swap doesn't clear. Every game sees the charge on them (ChargeLook, from their ZDO)
-    // - A swap calls the new staff's twin (CallerBoss.RPC_Punish): it smites the player at once ("dealing moderate damage
-    //   and removing the accumulated lightning debuffs, then comet towards that player and proceed to following them
-    //   instead"). The first draw of a fight isn't a swap: no smite. The old element's charge is held at HeldStacks, up or
-    //   down to it, slowing nothing, until the new staff's own reaches HeldStacks, and then goes; taking the old staff up
-    //   again before that carries on from HeldStacks. Until 2026-11-15 a swap cleared it at once, which let a player stay
-    //   on one staff by swapping away and straight back; the user's rule then: "when swapping the staff, set the previous
-    //   staff's stack at 4 (from any value it was at, either 1 or > 5) and keep it at 4 until the current stack reaches 4"
-    //   (it slowing nothing while held is Claude's pick: otherwise eitr or stamina would be slowed most of the fight)
+    // - A swap (the fight's redesign, agreed with the user 2026-11-15, its changes 2 and 3; the first draw of a fight
+    //   isn't one, and gets no answer): the old staff's charge drains evenly to nothing over DrainTime from whatever it
+    //   was, slowing nothing meanwhile; drawn again before it's gone, it builds on from where it is, and a swap never
+    //   starts a charge's clock again (Build, Drain). So DrainTime on one staff leaves the other clean whatever it had, a
+    //   steady rhythm under 25 s never passes 4 stacks, and swapping fast only keeps both charges between 3 and 4. And
+    //   the new staff's twin answers (CallerBoss.RPC_Punish): a clean staff (no charge left) with its rune under the
+    //   player, striking AnswerDelay later as the twin lands on it, and nothing for who has left it; a staff still
+    //   charged at once, with its smite, unavoidable, and its rush. Before the redesign a swap cleared the old charge
+    //   (until 2026-11-15: it let a player stay on one staff by swapping away and straight back), then held it at 4
+    //   stacks until the new staff's reached 4 (the user's rule of that day), started the new staff's clock again (so
+    //   swapping every 4.9 s meant no stack ever landed), and the answer was always the smite and the rush
+    // - A fallen twin's element is silent while its twin fights on alone (Silence; the fight's redesign, agreed with the
+    //   user 2026-11-15, its change 7: "While a twin is down, its element does nothing to players, so the last window is
+    //   one staff, one target and the raise countdown"): its charge goes and builds no more, so no overload comes of it
+    //   (until then its smites went on coming "from the elements"), and drawing its staff, the only one that hurts the
+    //   survivor (TwinsRules: a staff cannot hurt its own caller), gets no answer. If the twin rises, its charge builds
+    //   again from none. The survivor's own element is as ever
     internal static class TwinsDuel
     {
-        internal const float EngageRadius = 50f;
-        private const float LeaveRadius = 80f;
+        // How often the player's game tells the twins of their fight that they're in it, alive (seconds)
+        private const float PresentEvery = 1f;
         private const float StackInterval = 5f;
         internal const int MaxStacks = 5;
-        // A staff's charge put down is held at this, and goes once the other's reaches it: one short of a smite
-        internal const int HeldStacks = MaxStacks - 1;
+        // Once the other staff is drawn, a charge drains to nothing over this long, from whatever it was (seconds)
+        private const float DrainTime = 20f;
+        // A draining charge this small is gone (stacks)
+        private const float CleanBelow = 0.005f;
+        // The swap's answer to a clean staff: the twin's rune under the player, striking this long after it shows (the
+        // storm's rain runes warn as long), this wide (the comet's mark), for SwapDamage to whoever is still on it
+        internal const float AnswerDelay = 1.2f;
+        internal const float AnswerRadius = 2.5f;
         // Each stack slows eitr's (Static) or stamina's (Scorch) return by this much
         private const float RegenCut = 0.2f;
         // The smites: the swap's and the full charge's, moderate (150 is 56 after 100 armor), the full charge's half again
@@ -74,8 +91,17 @@ namespace NhxMagicWeapons.Bosses
         internal static GameObject s_fireRune;
 
         private static bool s_inFight;
+        private static float s_presentTimer;
         private static Element s_drawn;
-        private static float s_stackTimer;
+
+        // Whether the local player is in the twins' fight (TwinsJudgment: no attack there but the staves'; TwinsLog)
+        internal static bool InFight => s_inFight;
+        // The element whose twin has fallen, if one has: silent (Silence)
+        private static Element s_silent;
+        // Each element's charge on the player, in stacks (by Element): building evenly while its staff is the last drawn,
+        // a stack each StackInterval, and draining evenly while the other is, at the pace set as that one was drawn
+        private static readonly float[] s_charge = new float[3];
+        private static readonly float[] s_drain = new float[3];
         // Overloads since the last swap
         private static int s_overloads;
         private static float s_lookTimer;
@@ -155,26 +181,35 @@ namespace NhxMagicWeapons.Bosses
                 }
                 return;
             }
-            float nearest = CallerBoss.NearestLiving(player.transform.position, Element.None, out _);
-            bool inRing = InRing(player.transform.position);
+            Vector3 position = player.transform.position;
+            bool inside = TwinsRing.Fight(position, out CallerBoss twin);
+            bool ring = TwinsBond.Arena(twin, out Vector3 arena);
             if (!s_inFight)
             {
-                if (nearest > EngageRadius && !inRing)
+                if (!inside)
                 {
                     return;
                 }
                 s_inFight = true;
+                s_presentTimer = 0f;
+                s_silent = Element.None;
+                System.Array.Clear(s_charge, 0, s_charge.Length);
+                System.Array.Clear(s_drain, 0, s_drain.Length);
                 SetDrawn(player, Element.None);
                 StartStats(player);
-                TwinsLog.Event($"{TwinsLog.Name(player)} joins the fight ({nearest:0} m from the nearest twin{(inRing ? ", inside the ring" : "")}).");
+                TwinsLog.Event($"{TwinsLog.Name(player)} joins the fight ({(ring ? "inside the ring" : "by twins with no arena")}, "
+                    + $"{Vector3.Distance(position, twin.transform.position):0} m from the nearest twin).");
             }
-            // A judged player stays in it until they die, however far they run (while the twins live); anyone in the ring
-            // stays in it, however far the twins are (the ring is wider than LeaveRadius from edge to edge)
-            else if (nearest > LeaveRadius && !inRing && (!TwinsJudgment.Judged || float.IsInfinity(nearest)))
+            // Out of it (the ring holds, so: the twins gone, or twins with no arena left behind, or a cheat). A judged
+            // player stays in it until they die, wherever they are (while a twin lives)
+            else if (!inside && (!TwinsJudgment.Judged || float.IsInfinity(CallerBoss.NearestLiving(position, Element.None, out _))))
             {
                 Leave(player);
                 return;
             }
+            // The ring holds them, and the twins of their fight know they're there
+            TwinsRing.HoldPlayer(inside && ring, arena);
+            Present(position, dt);
             s_fightTime += dt;
             s_timeWith[(int)s_drawn] += dt;
 
@@ -185,42 +220,164 @@ namespace NhxMagicWeapons.Bosses
             {
                 TwinsPhase.UpdatePlayer(player, dt);
             }
+            // A fallen twin's element goes silent, and builds nothing
+            Silence(player);
             Element held = ElementOf(player.m_rightItem);
             if (held != Element.None && held != s_drawn)
             {
                 Draw(player, held);
             }
-            if (s_drawn != Element.None)
+            // The last staff drawn builds its charge, the other's drains
+            foreach (Element element in s_elements)
             {
-                s_stackTimer -= dt;
-                if (s_stackTimer <= 0f)
+                if (element == s_silent)
                 {
-                    s_stackTimer += StackInterval;
-                    Stack(player, s_drawn);
+                    continue;
+                }
+                if (element == s_drawn)
+                {
+                    Build(player, element, dt);
+                }
+                else if (s_charge[(int)element] > 0f)
+                {
+                    Drain(player, element, dt);
                 }
             }
         }
 
-        // Whether `point` is within the ring of an arena whose twins live (an altar's: TwinsBond.Arena), its edge's grace
-        // included, as the twins count it (TwinsAI.InReach)
-        internal static bool InRing(Vector3 point)
+        // The drawn staff's charge builds, from wherever it is: a stack each StackInterval
+        private static void Build(Player player, Element element, float dt)
         {
+            int e = (int)element;
+            bool none = s_charge[e] <= 0f;
+            int before = Mathf.FloorToInt(s_charge[e]);
+            s_charge[e] += dt / StackInterval;
+            if (none)
+            {
+                Show(player, element);
+            }
+            int now = Mathf.FloorToInt(s_charge[e]);
+            for (int stacks = before + 1; stacks <= now; stacks++)
+            {
+                Stack(player, element, stacks);
+            }
+        }
+
+        // The other staff's charge drains, at the pace set as it was put down (Draw), until its staff is clean
+        private static void Drain(Player player, Element element, float dt)
+        {
+            int e = (int)element;
+            s_charge[e] -= s_drain[e] * dt;
+            // Clean at DrainTime sharp, as the new staff's fourth stack lands: not a frame's rounding later
+            if (s_charge[e] > CleanBelow && s_drain[e] > 0f)
+            {
+                Show(player, element);
+                return;
+            }
+            s_charge[e] = 0f;
+            s_drain[e] = 0f;
+            Clear(player, element);
+            TwinsLog.Event($"{TwinsLog.Name(player)}'s {ChargeName(element)} has drained to nothing: the {StaffName(element)} is clean.");
+        }
+
+        // The charge's status effect, as the charge is: there for as long as there's any of it, so the player sees which
+        // staff isn't clean, and what answer drawing it would get; with its stacks in hand, or how long until it's gone
+        private static void Show(Player player, Element element)
+        {
+            int e = (int)element;
+            ElementCharge effect = Charge(player, element);
+            if (s_charge[e] <= 0f)
+            {
+                if (effect)
+                {
+                    Clear(player, element);
+                }
+                return;
+            }
+            if (!effect)
+            {
+                effect = player.GetSEMan().AddStatusEffect(ChargeHash(element)) as ElementCharge;
+            }
+            if (!effect)
+            {
+                return;
+            }
+            int stacks = Mathf.FloorToInt(s_charge[e]);
+            if (element == s_drawn)
+            {
+                effect.Build(stacks);
+            }
+            else
+            {
+                effect.Drain(stacks, s_drain[e] > 0f ? s_charge[e] / s_drain[e] : 0f);
+            }
+        }
+
+        // Every PresentEvery: each living twin whose fight the player is in hears of it, on the game that runs it
+        // (CallerBoss.PresentRpc), which sends the twins away when no one has said so for a while (TwinsRules)
+        private static void Present(Vector3 position, float dt)
+        {
+            s_presentTimer -= dt;
+            if (s_presentTimer > 0f)
+            {
+                return;
+            }
+            s_presentTimer = PresentEvery;
             foreach (CallerBoss boss in CallerBoss.All)
             {
-                if (boss && boss.m_humanoid && !boss.m_humanoid.IsDead() && TwinsBond.Arena(boss, out Vector3 arena)
-                    && Utils.DistanceXZ(point, arena) <= TwinsAltars.ArenaRadius + TwinsRules.ArenaGrace)
+                if (boss && boss.m_humanoid && !boss.m_humanoid.IsDead() && boss.m_nview && boss.m_nview.IsValid() && TwinsRing.Inside(boss, position))
                 {
-                    return true;
+                    boss.m_nview.InvokeRPC(CallerBoss.PresentRpc);
                 }
             }
-            return false;
+        }
+
+        // Whether `element` is silent: its twin fallen (or never there), the other's fighting on alone (TwinsBond.Alone,
+        // from the survivor's ZDO: a twin only not loaded on this game isn't a fallen one)
+        private static bool Silent(Player player, Element element)
+        {
+            CallerBoss.NearestLiving(player.transform.position, Other(element), out CallerBoss survivor);
+            return survivor && TwinsBond.Alone(survivor);
+        }
+
+        // Every frame of the fight: the fallen twin's element going silent (its charge goes, in hand or draining), and
+        // sounding again as the twin rises (its staff in hand, its charge builds again from none)
+        private static void Silence(Player player)
+        {
+            Element silent = Silent(player, Element.Storm) ? Element.Storm : Silent(player, Element.Fire) ? Element.Fire : Element.None;
+            if (silent == s_silent)
+            {
+                return;
+            }
+            Element was = s_silent;
+            s_silent = silent;
+            if (was != Element.None)
+            {
+                TwinsLog.Event($"{TwinsLog.Name(player)}: {ChargeName(was)} is silent no more (its twin is back){(s_drawn == was ? ": it builds again from none" : "")}.");
+            }
+            if (silent != Element.None)
+            {
+                int s = (int)silent;
+                TwinsLog.Event($"{TwinsLog.Name(player)}: {ChargeName(silent)} goes silent (its twin has fallen): "
+                    + $"{(s_charge[s] > 0f ? $"{s_charge[s]:0.0} {(silent == s_drawn ? "in hand" : "draining")} -> gone" : "none on them")}, and it builds no more.");
+                s_charge[s] = 0f;
+                s_drain[s] = 0f;
+                Clear(player, silent);
+            }
+            if (s_drawn != Element.None && (s_drawn == was || s_drawn == silent))
+            {
+                s_overloads = 0;
+                if (s_drawn == silent)
+                {
+                    SetStacks(player, 0);
+                }
+            }
         }
 
         private static void Draw(Player player, Element held)
         {
             Element old = s_drawn;
             SetDrawn(player, held);
-            s_stackTimer = StackInterval;
             float heldFor = Time.time - s_drawnAt;
             s_drawnAt = Time.time;
             if (old == Element.None)
@@ -228,41 +385,56 @@ namespace NhxMagicWeapons.Bosses
                 TwinsLog.Event($"{TwinsLog.Name(player)} draws the {StaffName(held)} (first draw).");
                 return;
             }
-            // A swap: the new staff's charge, if it was held, builds on from where it is (a swap straight back gains
-            // nothing); the old one is held until the new one reaches HeldStacks, or goes at once if it already has. The
-            // overloads' growth goes (not their SmiteWeakness, which runs out on its own), and the new staff's twin answers
-            ElementCharge leaving = Charge(player, old);
-            int was = leaving ? leaving.Stacks : 0;
-            ElementCharge taken = Charge(player, held);
-            if (taken)
-            {
-                taken.TakeUp();
-            }
-            SetStacks(player, taken ? taken.Stacks : 0);
-            bool takenOver = taken && taken.Stacks >= HeldStacks;
-            if (takenOver)
-            {
-                Clear(player, old);
-            }
-            else
-            {
-                Hold(player, old);
-            }
+            // A swap: the old staff's charge drains from here, over DrainTime whatever it is; the new staff's, if any is
+            // left, builds on from where it is. The overloads' growth goes (not their SmiteWeakness, which runs out on its
+            // own), and the new staff's twin answers: with its rune for a clean staff, at once for one still charged.
+            // A silent element (its twin fallen: Silence) has no charge to drain or to build on, and no twin to answer
+            int o = (int)old;
+            int h = (int)held;
+            s_drain[o] = s_charge[o] / DrainTime;
+            s_drain[h] = 0f;
+            bool clean = s_charge[h] <= 0f;
+            Show(player, old);
+            Show(player, held);
+            SetStacks(player, Mathf.FloorToInt(s_charge[h]));
             s_overloads = 0;
             s_swaps++;
-            if (taken)
+            if (!clean)
             {
                 s_takenBack++;
             }
             CallerBoss.NearestLiving(player.transform.position, held, out CallerBoss twin);
             TwinsLog.Event($"{TwinsLog.Name(player)} swaps to the {StaffName(held)} after {heldFor:0} s on the {StaffName(old)}: "
-                + $"{ChargeName(old)} {was} -> {(takenOver ? "gone" : $"held at {HeldStacks}")}, "
-                + $"{ChargeName(held)} {(taken ? $"taken up again at {taken.Stacks}" : "starts from none")}; "
-                + $"{(twin ? "the " + TwinsLog.Name(twin) + " answers" : "no living twin of it to answer")}. Now: {Describe(player, true)}.");
+                + $"{ChargeName(old)} {(old == s_silent ? "silent" : s_charge[o] > 0f ? $"{s_charge[o]:0.0}, draining over {DrainTime:0} s" : "none")}, "
+                + $"{ChargeName(held)} {(held == s_silent ? "silent (its twin has fallen)" : clean ? "none: a clean staff" : $"still {s_charge[h]:0.0}: it builds on")}; "
+                + $"{(twin ? $"the {TwinsLog.Name(twin)} answers {(clean ? "with its rune" : "at once")}" : "no living twin of it to answer")}. Now: {Describe(player, true)}.");
             if (twin)
             {
-                twin.m_nview.InvokeRPC(CallerBoss.PunishRpc, player.GetZDOID());
+                twin.m_nview.InvokeRPC(CallerBoss.PunishRpc, player.GetZDOID(), clean);
             }
+        }
+
+        // The hit of a twin's rune answering a clean staff (CallerBoss.RPC_Punish): SwapDamage of its element to
+        // whoever is on the rune as it strikes; a roll through it dodges it, a block doesn't stop it, and it doesn't
+        // stagger (as the storm's rain: TwinsStorm)
+        internal static HitData AnswerHit(Element element, Character attacker)
+        {
+            HitData hit = new HitData();
+            if (element == Element.Storm)
+            {
+                hit.m_damage.m_lightning = SwapDamage;
+            }
+            else
+            {
+                hit.m_damage.m_fire = SwapDamage;
+            }
+            hit.m_blockable = false;
+            hit.m_dodgeable = true;
+            hit.m_ranged = true;
+            hit.m_staggerMultiplier = 0f;
+            hit.m_hitType = HitData.HitType.EnemyHit;
+            hit.SetAttacker(attacker);
+            return hit;
         }
 
         private static string StaffName(Element element)
@@ -275,7 +447,7 @@ namespace NhxMagicWeapons.Bosses
             return element == Element.Storm ? "Static" : "Scorch";
         }
 
-        private static Element Other(Element element)
+        internal static Element Other(Element element)
         {
             return element == Element.Storm ? Element.Fire : Element.Storm;
         }
@@ -288,28 +460,13 @@ namespace NhxMagicWeapons.Bosses
             zdo.Set(DrawnKey, ZNet.instance ? ZNet.instance.GetTime().Ticks : 0L);
         }
 
-        private static void Stack(Player player, Element element)
+        // The drawn staff's charge reaches `stacks` (Build)
+        private static void Stack(Player player, Element element, int stacks)
         {
-            ElementCharge charge = Charge(player, element);
-            if (!charge)
-            {
-                player.GetSEMan().AddStatusEffect(ChargeHash(element));
-                SetStacks(player, 1);
-                LogStack(player, element, 1, null);
-                return;
-            }
-            bool full = charge.AddStack();
-            SetStacks(player, charge.Stacks);
-            // The charge in hand has taken over from the one held
-            Element other = Other(element);
-            string tookOver = null;
-            if (charge.Stacks >= HeldStacks && Charge(player, other))
-            {
-                tookOver = ChargeName(other);
-                Clear(player, other);
-            }
-            LogStack(player, element, charge.Stacks, tookOver);
-            if (!full)
+            Show(player, element);
+            SetStacks(player, stacks);
+            LogStack(player, element, stacks);
+            if (stacks < MaxStacks)
             {
                 return;
             }
@@ -317,7 +474,7 @@ namespace NhxMagicWeapons.Bosses
             // them weaker to it for a while (after the hit: this smite hits as the last one left them)
             CallerBoss.NearestLiving(player.transform.position, element, out CallerBoss twin);
             float smite = OverloadDamage * Mathf.Pow(OverloadGrowth, s_overloads);
-            TwinsLog.Event($"{TwinsLog.Name(player)} overloads with {ChargeName(element)} at {charge.Stacks} ({s_overloads + 1} since the last swap): a smite of {smite:0} from the {(twin ? TwinsLog.Name(twin) : "elements")}.");
+            TwinsLog.Event($"{TwinsLog.Name(player)} overloads with {ChargeName(element)} at {stacks} ({s_overloads + 1} since the last swap): a smite of {smite:0} from the {(twin ? TwinsLog.Name(twin) : "elements")}.");
             Smite(element, player, twin ? twin.m_humanoid : null, smite, OverloadRadius);
             s_overloads++;
             s_smites++;
@@ -346,7 +503,7 @@ namespace NhxMagicWeapons.Bosses
 
         // Each stack in the log: what the fight has put on the player, and their regen with every effect on them (the
         // charges', the armor's, meads'...)
-        private static void LogStack(Player player, Element element, int stacks, string tookOver)
+        private static void LogStack(Player player, Element element, int stacks)
         {
             s_mostStacks[(int)element] = Mathf.Max(s_mostStacks[(int)element], stacks);
             SEMan seman = player.GetSEMan();
@@ -354,12 +511,12 @@ namespace NhxMagicWeapons.Bosses
             seman.ModifyEitrRegen(ref eitr);
             float stamina = 1f;
             seman.ModifyStaminaRegen(ref stamina);
-            TwinsLog.Event($"{TwinsLog.Name(player)}'s {ChargeName(element)} reaches {stacks}{(tookOver != null ? $", taking over: their {tookOver} goes" : "")}. "
+            TwinsLog.Event($"{TwinsLog.Name(player)}'s {ChargeName(element)} reaches {stacks}. "
                 + $"Now: {Describe(player, true)}; regen with every effect: eitr x{eitr:0.00}, stamina x{stamina:0.00}.");
         }
 
-        // "Static 6 in hand (eitr regen x0.00), Scorch 4 held (no effect), Stormstruck 2 (48 s left)": what the fight has
-        // put on the player, for the log (TwinsLog's hit lines too, without the regen)
+        // "Static 6.2 in hand (eitr regen x0.00), Scorch 2.4 draining, clean in 12 s (no effect), Stormstruck 2 (48 s
+        // left)": what the fight has put on the local player, for the log (TwinsLog's hit lines too, without the regen)
         internal static string Describe(Player player, bool regen)
         {
             if (!player)
@@ -369,12 +526,17 @@ namespace NhxMagicWeapons.Bosses
             List<string> parts = new List<string>();
             foreach (Element element in s_elements)
             {
-                ElementCharge charge = Charge(player, element);
-                if (charge)
+                int e = (int)element;
+                float charge = s_charge[e];
+                if (charge <= 0f)
                 {
-                    string effect = !regen ? "" : charge.Held ? " (no effect)" : $" ({(element == Element.Storm ? "eitr" : "stamina")} regen x{charge.RegenLeft:0.00})";
-                    parts.Add($"{ChargeName(element)} {charge.Stacks} {(charge.Held ? "held" : "in hand")}{effect}");
+                    continue;
                 }
+                bool drawn = element == s_drawn;
+                string effect = !regen ? ""
+                    : drawn ? $" ({(element == Element.Storm ? "eitr" : "stamina")} regen x{Mathf.Max(0f, 1f - RegenCut * Mathf.FloorToInt(charge)):0.00})"
+                    : " (no effect)";
+                parts.Add($"{ChargeName(element)} {charge:0.0} {(drawn ? "in hand" : $"draining, clean in {(s_drain[e] > 0f ? charge / s_drain[e] : 0f):0} s")}{effect}");
             }
             foreach (Element element in s_elements)
             {
@@ -418,7 +580,7 @@ namespace NhxMagicWeapons.Bosses
             TwinsLog.Event($"Fight summary for {name}: {Clock(s_fightTime)} in the fight; the Staff of Storms the last drawn for "
                 + $"{Clock(s_timeWith[(int)Element.Storm])}, the Wrath of Muspelheim for {Clock(s_timeWith[(int)Element.Fire])}, "
                 + $"no staff drawn yet for {Clock(s_timeWith[(int)Element.None])}.");
-            TwinsLog.Event($"Fight summary for {name}: {s_swaps} swaps, {s_takenBack} of them back to a staff whose charge was still held; "
+            TwinsLog.Event($"Fight summary for {name}: {s_swaps} swaps, {s_takenBack} of them to a staff not yet clean (answered at once); "
                 + $"most stacks: Static {s_mostStacks[(int)Element.Storm]}, Scorch {s_mostStacks[(int)Element.Fire]}; "
                 + $"{s_smites} overload smites, {s_smiteDamage:0} before resistances and armor; "
                 + $"most steps: Stormstruck {s_mostSteps[(int)Element.Storm]}, Flamestruck {s_mostSteps[(int)Element.Fire]}.");
@@ -435,20 +597,6 @@ namespace NhxMagicWeapons.Bosses
         private static ElementCharge Charge(Player player, Element element)
         {
             return player.GetSEMan().GetStatusEffect(ChargeHash(element)) as ElementCharge;
-        }
-
-        // The staff put down: its charge held at HeldStacks, from whatever it was (none yet too)
-        private static void Hold(Player player, Element element)
-        {
-            ElementCharge charge = Charge(player, element);
-            if (!charge)
-            {
-                charge = player.GetSEMan().AddStatusEffect(ChargeHash(element)) as ElementCharge;
-            }
-            if (charge)
-            {
-                charge.Hold(HeldStacks);
-            }
         }
 
         // Its count on the player's ZDO is the drawn staff's, left to the callers
@@ -474,6 +622,10 @@ namespace NhxMagicWeapons.Bosses
             TwinsLog.Event($"{(player ? TwinsLog.Name(player) : s_playerName)} leaves the fight{(player && player.IsDead() ? " (dead)" : "")}.");
             Summarize();
             s_inFight = false;
+            TwinsRing.HoldPlayer(false, Vector3.zero);
+            s_silent = Element.None;
+            System.Array.Clear(s_charge, 0, s_charge.Length);
+            System.Array.Clear(s_drain, 0, s_drain.Length);
             s_overloads = 0;
             TwinsJudgment.Reset(player);
             if (player && player.m_nview && player.m_nview.IsValid())

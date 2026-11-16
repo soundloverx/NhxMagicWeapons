@@ -243,7 +243,7 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
                 {
                     continue;
                 }
-                if (StaffHits.IsValidTarget(m_owner, character) && StaffHits.InSight(center, character.GetCenterPoint()))
+                if (StaffHits.Seeks(m_owner, character) && StaffHits.InSight(center, character.GetCenterPoint()))
                 {
                     m_tendrilTargets.Add(character);
                 }
@@ -291,7 +291,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim
             {
                 GameObject hit = Projectile.FindHitObject(collider);
                 Character character = hit ? hit.GetComponent<Character>() : null;
-                if (character && !character.IsDead())
+                // Not a twin the staff can't hurt (Bosses\TwinsRules.Immune): the thread ends on it, as on a wall
+                if (character && !character.IsDead() && !Bosses.TwinsRules.Immune(m_owner, character))
                 {
                     m_target = character;
                     m_unseen = 0f;

@@ -134,7 +134,8 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
                     break;
                 }
                 Vector3 ground = hit.point;
-                if (ground.y < water - MaxWading || Blocked(last, ground) || !Free(ground, radius, height))
+                // Nor past the edge of the twins' ring, for who it holds (Bosses\TwinsRing)
+                if (ground.y < water - MaxWading || Blocked(last, ground) || !Free(ground, radius, height) || Bosses.TwinsRing.Stops(player, ground))
                 {
                     break;
                 }

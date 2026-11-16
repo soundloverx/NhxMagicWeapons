@@ -12,7 +12,8 @@ namespace NhxMagicWeapons.Bosses
     // - The dais: a ruined Ashlands floor, the sigil's three rings turning on it (blue, violet, orange), four broken
     //   pillars at its corners, the twins' crystals circling over its middle (TwinsAltar: offer a lodestone there)
     // - The arena: Stones twisted pillar bases ArenaRadius out, each crowned with a floating crystal, storm and fire in
-    //   turn, with a light and motes, standing at the dais's ground height (the leveled arena's; BuildStones)
+    //   turn, with a light and motes, standing at the dais's ground height (the leveled arena's; BuildStones). While
+    //   the twins live, the ring is drawn along them (RingLook), and holds whoever is inside (TwinsRing)
     // - The ground leveled and cleared about the dais (TerrainModifier), and no building within NoBuildRadius (the
     //   game's no-build zone of locations: Location.m_noBuild, as at its boss altars)
     // Built as the game builds its locations: every game makes the location's looks from a networked LocationProxy, so an
@@ -92,6 +93,10 @@ namespace NhxMagicWeapons.Bosses
             s_missing.Clear();
             BuildDais(dais.transform);
             BuildStones(root.transform);
+            // The ring drawn along the stones while the twins live (RingLook): the edge that holds (TwinsRing)
+            RingLook ring = root.AddComponent<RingLook>();
+            ring.m_radius = ArenaRadius;
+            ring.m_stones = Stones;
             if (s_missing.Count > 0)
             {
                 Plugin.Log.LogWarning("The twins' altar is without: " + string.Join(", ", s_missing) + " (not in the game).");
@@ -541,7 +546,7 @@ namespace NhxMagicWeapons.Bosses
         // An admin's ask to remove the altar nearest them (within CleanReach; the user, 2026-11-15: "add nhx_altar
         // remove"), as place force removes a modded place (RemoveLocation): gone from the game's list (its zone free
         // again, one fewer for generate to count) and from the world, its ground back as it was (the leveling was its
-        // own). What it cleared stays cleared. Not while the twins are near it
+        // own). What it cleared stays cleared. Not while its twins are there
         internal static void RequestRemove(Vector3 point) => ZRoutedRpc.instance.InvokeRoutedRPC(RemoveRpc, point);
 
         private const string RemoveRpc = "NhxAltarRemove";
@@ -565,9 +570,9 @@ namespace NhxMagicWeapons.Bosses
             Report(sender, $"The altar at {Where(altar.m_position)} is gone ({RemoveLocation(altar)} objects removed).");
         }
 
-        // Whether a twin is within TwinsAltar.Busy of `point`, as the dais asks before calling them; from the twins'
-        // ZDOs, which the server holds all of (a dedicated one doesn't make the twins themselves, so CallerBoss.All
-        // wouldn't do)
+        // Whether twins called into the arena at `point` are in the world, as the dais asks before calling them
+        // (TwinsRing.Called); from the twins' ZDOs, which the server holds all of (a dedicated one doesn't make the twins
+        // themselves, so CallerBoss.All wouldn't do)
         private static bool TwinsNear(Vector3 point)
         {
             int storm = CallerBosses.StormName.GetStableHashCode();
@@ -575,7 +580,7 @@ namespace NhxMagicWeapons.Bosses
             foreach (ZDO zdo in ZDOMan.instance.m_objectsByID.Values)
             {
                 if (zdo != null && (zdo.GetPrefab() == storm || zdo.GetPrefab() == fire)
-                    && Vector3.Distance(zdo.GetPosition(), point) < TwinsAltar.Busy)
+                    && TwinsBond.Arena(zdo, out Vector3 arena) && Utils.DistanceXZ(arena, point) < 1f)
                 {
                     return true;
                 }
@@ -711,16 +716,16 @@ namespace NhxMagicWeapons.Bosses
     }
 
     // The altar's dais (on its own object, the floor, pillars, runes and crystals under it): looked at, it asks for a
-    // lodestone; offered one, it calls the twins over
-    // it, linked, their arena the altar's (TwinsBond.Summon), and keeps the lodestone. Not while twins are already near
+    // lodestone, and warns of what calling the twins means (the fight's redesign, agreed with the user 2026-11-15: "The
+    // altar warns first. Its hover text says that the ring holds everyone inside until the fight ends, and that the
+    // fight needs both staves"); offered one, it calls the twins over it, linked, their arena the altar's
+    // (TwinsBond.Summon), and keeps the lodestone. Not while its twins are already there (TwinsRing.Called: until the
+    // redesign, any twin within 90 m)
     internal class TwinsAltar : MonoBehaviour, Hoverable, Interactable
     {
-        // Twins within this of the altar are a fight already going
-        internal const float Busy = 90f;
-
         public string GetHoverText()
         {
-            return Localization.instance.Localize("$piece_nhx_twins_altar\n[<color=yellow><b>1-8</b></color>] $piece_nhx_twins_offer");
+            return Localization.instance.Localize("$piece_nhx_twins_altar\n[<color=yellow><b>1-8</b></color>] $piece_nhx_twins_offer\n<color=orange>$piece_nhx_twins_warning</color>");
         }
 
         public string GetHoverName()
@@ -748,7 +753,7 @@ namespace NhxMagicWeapons.Bosses
             {
                 return false;
             }
-            if (CallerBoss.NearestLiving(transform.position, Element.None, out _) < Busy)
+            if (TwinsRing.Called(transform.position))
             {
                 user.Message(MessageHud.MessageType.Center, "$msg_nhx_altar_busy");
                 return true;

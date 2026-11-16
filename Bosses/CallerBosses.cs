@@ -165,7 +165,6 @@ namespace NhxMagicWeapons.Bosses
             if (monsterView)
             {
                 nview.m_persistent = monsterView.m_persistent;
-                nview.m_distant = monsterView.m_distant;
                 nview.m_type = monsterView.m_type;
                 nview.m_syncInitialScale = monsterView.m_syncInitialScale;
             }
@@ -173,15 +172,27 @@ namespace NhxMagicWeapons.Bosses
             {
                 nview.m_persistent = true;
             }
+            // Loaded as far as the game loads anything (its distant objects: the simulation distance's far zones too), not
+            // only within its near zones as monsters are: the ring is 80 m across, and at the smallest simulation
+            // distance a twin at one edge could be gone from the game of a player at the other, which would then count
+            // that player out of the fight (TwinsRing asks the twins on its game), free of the ring's hold and of its
+            // charges. The game that runs it is still one that has it near
+            nview.m_distant = true;
             ZSyncTransform sync = boss.GetComponent<ZSyncTransform>();
             ZSyncTransform monsterSync = monster ? monster.GetComponent<ZSyncTransform>() : null;
             if (sync && monsterSync)
             {
                 sync.m_syncPosition = monsterSync.m_syncPosition;
                 sync.m_syncRotation = monsterSync.m_syncRotation;
-                sync.m_syncScale = monsterSync.m_syncScale;
                 sync.m_syncBodyVelocity = monsterSync.m_syncBodyVelocity;
                 sync.m_characterParentSync = monsterSync.m_characterParentSync;
+            }
+            // Its size isn't sent: every game grows it from when its second phase began (TwinsPhase.Grow). Sent, the
+            // owner's grown size would also be kept as its size to load with (with ZNetView's m_syncInitialScale), and
+            // grown again
+            if (sync)
+            {
+                sync.m_syncScale = false;
             }
 
             // The body hidden: the armor alone, the hood's eyes glowing in it. Not a player's equipment any more, so no

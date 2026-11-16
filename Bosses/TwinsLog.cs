@@ -19,9 +19,10 @@ namespace NhxMagicWeapons.Bosses
     // - Damage dealt outside a hit (burning, the arcs between players, the burning way, judgment), added up by target
     //   and cause over FlushEvery seconds
     // - Events: summons, roles and targets, voice lines (said, heard, played, dropped), deaths, raises, wins, vanishing,
-    //   the second phase and its spells, creatures held, draws and swaps, overloads, judgment, rushes
+    //   the second phase and its spells, creatures held, draws and swaps, overloads, judgment, rushes, a fallen twin's
+    //   element going silent and sounding again
     // - The staves' duel (TwinsDuel; the user, 2026-11-15: "when players swap staves, the number of stacks, the hits they
-    //   take and deliver, the vulnerability debuffs"): every stack with both charges (in hand or held) and the regen
+    //   take and deliver, the vulnerability debuffs"): every stack with both charges (in hand or draining) and the regen
     //   left, every swap with how long the old staff was out and what became of both charges, Stormstruck and
     //   Flamestruck as they come, grow and wear off with the resistance they leave; on every hit the local player takes,
     //   what the duel has put on them. The local player's hits on a twin another game runs, as sent (that game logs what
@@ -32,8 +33,6 @@ namespace NhxMagicWeapons.Bosses
     internal static class TwinsLog
     {
         private const float FlushEvery = 5f;
-        // The local player's hits are logged this near a living twin (TwinsDuel's leave radius)
-        private const float PlayerRange = 80f;
 
         private static bool On => Plugin.TwinsFightLog != null && Plugin.TwinsFightLog.Value;
 
@@ -150,9 +149,7 @@ namespace NhxMagicWeapons.Bosses
             {
                 return true;
             }
-            return character == Player.m_localPlayer
-                && (CallerBoss.NearestLiving(character.transform.position, Element.None, out _) <= PlayerRange
-                    || TwinsDuel.InRing(character.transform.position));
+            return character == Player.m_localPlayer && (TwinsDuel.InFight || TwinsRing.Fight(character.transform.position, out _));
         }
 
         // A twin's rules refused the hit being taken (TwinsRules)

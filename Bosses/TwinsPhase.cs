@@ -16,26 +16,63 @@ namespace NhxMagicWeapons.Bosses
     // your pick, no speed increase. But I do like the idea of keeping the players separated, so just arc lightning between
     // them whenever they are closer than 12m. It shouldn't be deadly, but enough for players to want to avoid that. There
     // is no need for a message on the screen, the visuals are enough"):
-    // - Its coming: the twin stops for TransitionTime, untouchable (TwinsRules), as the storm strikes it or Muspelheim's
-    //   blast bursts from it. A raised twin comes back at half health (TwinsBond), so in its second phase at once
-    // - The Stormcaller: its shards grow and race around it (Armor\ArmorLegendFx asks IsEnraged); every StormInterval it
-    //   calls the storm over the player it isn't hunting (TwinsStorm); and while it lives, players closer than LinkRange
-    //   to each other are joined by arcs of lightning that hurt both (UpdatePlayer)
+    // - Its coming (the user, 2026-11-16: "Can we make the transition into phase 2 a bit more flashy? The boss would stop
+    //   doing whatever he's doing for 5 seconds, grow by an additional 25% in size in that time [...] During those 5
+    //   seconds, I imagine runes floating around their body, the same runes that appear when hit by the staff they are
+    //   immune to"; then of Claude's take on it, the burst at the end and three extras: "I like absolutely everything you
+    //   described [...] I want all the extras"): the twin stands for TransitionTime, untouchable (TwinsRules: its ward
+    //   shows where a hit lands, its burning waits), and grows by Growth on every game (Grow). Its ward's runes circle it, closing in and
+    //   brightening (PhaseRunes); the Stormcaller's shards spread and grow, the Firecaller's wings open partway. As it
+    //   ends it raises its arms (its call's animation), the runes fall into it and burst out along the ground, the storm
+    //   strikes it or Muspelheim's blast bursts from it, its shards race or its wings burst fully open, and the players
+    //   near are pushed back (Push, no harm; a roll through it dodges it). A raised twin comes back at half health
+    //   (TwinsBond), so in its second phase at once, and comes into it as above, its line going ahead of any waiting
+    //   (TwinsVoices; the user: "as long as he plays his voice line again (the voice line gaining priority over anything
+    //   else when the boss resurrects, but without stopping voice lines already in progress)")
+    // - The Stormcaller: its shards grow and race around it (Armor\ArmorLegendFx asks ProgressOf); every StormInterval it
+    //   calls the storm over the player it isn't hunting (TwinsStorm); and while it lives, from its burst on, players
+    //   closer than LinkRange to each other are joined by arcs of lightning that hurt both (UpdatePlayer)
     // - The Firecaller: its wings open and stay (ChannelWings); every CometInterval it marks the player it isn't hunting
     //   with a rune and flames in its hands (CometWindup, standing), then comets through where they stood, CometPast
     //   beyond, hitting whoever is on the way, and the way burns for TrailTime, hurting whoever stands in it
     // - Alone with one player, the twin that watches (TwinsAI) casts its phase's spell at them in place of its own; the
-    //   hunter, with no one else, has no one to cast it at. No faster: their speeds and other attacks are as before.
+    //   hunter, with no one else, has no one to cast it at. A watching Firecaller comets every WatcherCometInterval (the
+    //   user, 2026-11-16: "When firecaller is watching, let it use the comet more often, with just a 7 seconds
+    //   cooldown"): its role as the comet comes due decides, so a watcher that starts hunting waits out CometInterval
+    //   from its last. No faster: their speeds and other attacks are as before.
+    // - Its twin fallen (the fight's redesign, agreed with the user 2026-11-15, its change 7): its second phase comes at
+    //   once, whatever its health (TwinFell), and it goes on casting its spell while it hunts alone: at another player
+    //   in the fight, or with no other, at its own quarry (OtherPlayer)
     // Whether it's come, and when, are in its ZDO, for every game's looks; its owner's game decides and casts
     internal class TwinsPhase : MonoBehaviour
     {
         internal const float Threshold = 0.5f;
-        private const float TransitionTime = 2f;
+        // Its coming: how long (2 s until the user's 5, 2026-11-16), and how much bigger it is by the end (a quarter again)
+        private const float TransitionTime = 5f;
+        private const float Growth = 0.25f;
+        // Its arms raised (its call's animation: BossAttacks) this long before the end, to be up as the runes fall in
+        private const string ArmsAnimation = "staff_shield";
+        private const float ArmsBefore = 0.4f;
+        // As it comes, the players within PushRadius (meters from where it stands) are pushed back, PushNear meters for one
+        // at its feet down to PushFar at the edge. The game moves a pushed character at PushSpeed (m/s) while its push
+        // lasts, the push waning by PushWane a second (Character.UpdatePushback), so a push of distance * PushWane /
+        // PushSpeed carries them that far on open ground
+        internal const float PushRadius = 6f;
+        private const float PushNear = 5f;
+        private const float PushFar = 2f;
+        private const float PushSpeed = 20f;
+        private const float PushWane = 100f;
+        // The Firecaller's wings open this far (0 to 1) as it comes, the rest of the way at once as it has come
+        private const float WingsWhileComing = 0.6f;
+        // The Stormcaller's shake as it has come (meters around, strength; Muspelheim's blast shakes for the Firecaller)
+        private const float StormShakeRange = 30f;
+        private const float StormShake = 0.6f;
         // Its first spell comes this long after the transition; with no one to cast it at, it looks again this often
         private const float FirstAfter = 3f;
         private const float RetryAfter = 1f;
         private const float StormInterval = 20f;
         private const float CometInterval = 14f;
+        private const float WatcherCometInterval = 7f;
         // The comet: the warning (standing, flames in its hands toward the rune, every WindupFlamesEvery), how far past the
         // mark it lands, who it hits on the way (within CometWidth of its line: fire, a roll dodges it, no block, a push),
         // and its burning way (TrailWidth either side, TrailTime)
@@ -49,7 +86,7 @@ namespace NhxMagicWeapons.Bosses
         private const float CometPush = 30f;
         private const float TrailTime = 5f;
         private const float TrailWidth = 1.5f;
-        // The Firecaller's burst as its phase comes (meters around, camera shake), and how fast its wings' flare dies
+        // The Firecaller's burst as its phase has come (meters around, camera shake), and how fast its wings' flare dies
         private const float FireBurstRadius = 5f;
         private const float FireBurstShake = 1f;
         private const float FlareFade = 1.5f;
@@ -67,8 +104,6 @@ namespace NhxMagicWeapons.Bosses
         private const float LinkShare = 0.05f;
         private const float ArcInterval = 0.25f;
         private const int ArcLevel = 12;
-        // A Stormcaller in its second phase this near joins the players
-        private const float LinkFightRadius = 80f;
 
         private static readonly int s_enragedKey = "nhx_twin_enraged".GetStableHashCode();
         private static readonly int s_enragedAtKey = "nhx_twin_enraged_at".GetStableHashCode();
@@ -80,11 +115,21 @@ namespace NhxMagicWeapons.Bosses
         private CallerBoss m_boss;
         private ZNetView m_nview;
         private Humanoid m_humanoid;
-        // On every game
+        private ZSyncAnimation m_animation;
+        // On every game: its size as it loaded (Grow), whether this game has looked at its phase yet, and whether it
+        // saw it coming (for its end: Come)
+        private Vector3 m_size = Vector3.one;
         private bool m_shown;
+        private bool m_watched;
         private float m_flare;
-        // On the owner's game
+        // On the owner's game: it was raised (TwinsBond.OnStart: its line comes first), its coming is under way, its
+        // arms are up
+        private bool m_raised;
+        private bool m_coming;
+        private bool m_armsUp;
         private float m_nextSpell;
+        // When its last comet was marked: a hunter's next waits CometInterval from it, a watcher's WatcherCometInterval
+        private float m_lastComet = float.NegativeInfinity;
         private float m_windup = -1f;
         private Vector3 m_aim;
         private float m_flameTimer;
@@ -94,10 +139,31 @@ namespace NhxMagicWeapons.Bosses
         // Its phase coming: untouchable, standing
         internal bool Transforming => Enraged && Now - m_nview.GetZDO().GetLong(s_enragedAtKey) < System.TimeSpan.FromSeconds(TransitionTime).Ticks;
 
-        // A twin in its second phase (its shards: Armor\ArmorLegendFx)
-        internal static bool IsEnraged(Character character)
+        // How far its phase has come: 0 before it, 1 once it has come, between as it comes (by the time every game shares)
+        internal float Progress
         {
-            return character && s_phases.TryGetValue(character, out TwinsPhase phase) && phase && phase.Enraged;
+            get
+            {
+                if (!Enraged)
+                {
+                    return 0f;
+                }
+                float since = (float)System.TimeSpan.FromTicks(Now - m_nview.GetZDO().GetLong(s_enragedAtKey)).TotalSeconds;
+                return Mathf.Clamp01(since / TransitionTime);
+            }
+        }
+
+        // How far a twin's second phase has come, 0 for anyone else (its shards: Armor\ArmorLegendFx)
+        internal static float ProgressOf(Character character)
+        {
+            return character && s_phases.TryGetValue(character, out TwinsPhase phase) && phase ? phase.Progress : 0f;
+        }
+
+        // It was just raised (TwinsBond.OnStart, on its owner's game, before its first Update): its phase's line, as it
+        // comes back in it, goes ahead of those waiting
+        internal void Raised()
+        {
+            m_raised = true;
         }
 
         // Standing still, facing `look`: as its phase comes, or winding up its comet (TwinsAI holds its AI)
@@ -122,10 +188,18 @@ namespace NhxMagicWeapons.Bosses
             m_boss = GetComponent<CallerBoss>();
             m_nview = GetComponent<ZNetView>();
             m_humanoid = GetComponent<Humanoid>();
+            m_animation = GetComponent<ZSyncAnimation>();
             if (m_humanoid)
             {
                 s_phases[m_humanoid] = this;
             }
+        }
+
+        // After every Awake: its size as the game made it (CallerBosses.Size, which the world's modifiers change a little in
+        // Character.Awake), the same on every game. Not sent (CallerBosses: ZSyncTransform), so never a grown one
+        private void Start()
+        {
+            m_size = transform.localScale;
         }
 
         private void OnDestroy()
@@ -145,26 +219,39 @@ namespace NhxMagicWeapons.Bosses
             float dt = Time.deltaTime;
             bool dead = m_humanoid.IsDead();
             bool enraged = Enraged;
-            if (enraged && !dead && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+            if (enraged && !dead)
             {
-                Looks(dt);
+                Grow();
+                if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+                {
+                    Looks(dt);
+                }
             }
             if (!m_nview.IsOwner() || dead)
             {
                 m_windup = -1f;
+                m_coming = false;
+                m_armsUp = false;
                 return;
             }
             if (!enraged)
             {
                 if (m_humanoid.GetHealthPercentage() <= Threshold)
                 {
-                    Enrage();
+                    Enrage(m_raised ? "raised" : null);
                 }
                 return;
             }
             if (Transforming)
             {
+                m_coming = true;
+                RaiseArms();
                 return;
+            }
+            if (m_coming)
+            {
+                m_coming = false;
+                Come();
             }
             if (m_boss.Element == Element.Storm)
             {
@@ -176,42 +263,112 @@ namespace NhxMagicWeapons.Bosses
             }
         }
 
-        // On every game: its phase's coming (once, if just now) and its wings
+        // On every game: its size, from how far its phase has come (eased in and out), set only as it changes
+        private void Grow()
+        {
+            Vector3 size = m_size * (1f + Growth * Mathf.SmoothStep(0f, 1f, Progress));
+            if ((transform.localScale - size).sqrMagnitude > 1e-8f)
+            {
+                transform.localScale = size;
+            }
+        }
+
+        // On every game: its phase's coming (its runes, if this game sees it come; the burst as it has come) and its wings
         private void Looks(float dt)
         {
+            bool transforming = Transforming;
             if (!m_shown)
             {
                 m_shown = true;
-                long at = m_nview.GetZDO().GetLong(s_enragedAtKey);
-                if (Now - at < System.TimeSpan.FromSeconds(TransitionTime + 1f).Ticks)
+                // A game that finds it already come (joining, or loading it) sees it as it is now
+                if (transforming)
                 {
-                    m_flare = 1f;
-                    if (m_boss.Element == Element.Fire && Wrath.Beam)
-                    {
-                        Wrath.Beam.ShowBlastOfRadius(transform.position, FireBurstRadius, FireBurstShake);
-                    }
+                    m_watched = true;
+                    PhaseRunes.Show(m_boss, m_nview.GetZDO().GetLong(s_enragedAtKey), TransitionTime, PushRadius);
                 }
+            }
+            if (m_watched && !transforming)
+            {
+                m_watched = false;
+                Climax();
             }
             if (m_boss.Element == Element.Fire)
             {
-                ChannelWings.Hold(m_humanoid, true, m_flare);
+                ChannelWings.Hold(m_humanoid, true, m_flare, transforming ? WingsWhileComing * Mathf.SmoothStep(0f, 1f, Progress) : 1f);
             }
             m_flare = Mathf.MoveTowards(m_flare, 0f, dt * FlareFade);
         }
 
-        private void Enrage()
+        // On every game, as its phase has come: Muspelheim's blast from the Firecaller (its wings burst open: Looks), a
+        // shake for the Stormcaller (the storm strikes it: Come); this game's player pushed back
+        private void Climax()
         {
-            ZDO zdo = m_nview.GetZDO();
-            zdo.Set(s_enragedKey, true);
-            zdo.Set(s_enragedAtKey, Now);
-            TwinsLog.Event($"{TwinsLog.Name(m_boss)} enters its second phase at {100f * m_humanoid.GetHealthPercentage():0}% health.");
-            // Its line (the user's recordings: TwinsVoices), queued behind its twin's if both come at once
-            TwinsVoices.Say(m_boss.Element == Element.Storm ? TwinsVoices.BlueP2 : TwinsVoices.RedP2, transform.position,
-                $"the {TwinsLog.Name(m_boss)} enters its second phase");
-            m_nextSpell = Time.time + TransitionTime + FirstAfter;
+            m_flare = 1f;
+            if (m_boss.Element == Element.Fire)
+            {
+                if (Wrath.Beam)
+                {
+                    Wrath.Beam.ShowBlastOfRadius(transform.position, FireBurstRadius, FireBurstShake);
+                }
+            }
+            else if (GameCamera.instance)
+            {
+                GameCamera.instance.AddShake(transform.position, StormShakeRange, StormShake, false);
+            }
+            Push(Player.m_localPlayer);
+        }
+
+        // This game's player, if they're in its fight within PushRadius, pushed straight away from it (on their own game,
+        // where their body moves): no harm, no stagger; one rolling just then isn't touched
+        private void Push(Player player)
+        {
+            if (!player || player.IsDead() || Judged(player) || !TwinsRing.Inside(m_boss, player.transform.position))
+            {
+                return;
+            }
+            Vector3 flat = player.transform.position - transform.position;
+            flat.y = 0f;
+            float distance = flat.magnitude;
+            if (distance > PushRadius)
+            {
+                return;
+            }
+            if (player.IsDodgeInvincible())
+            {
+                TwinsLog.Event($"{TwinsLog.Name(player)} rolls through the {TwinsLog.Name(m_boss)}'s burst ({distance:0.#} m from it).");
+                return;
+            }
+            Vector3 away = distance > 0.1f ? flat / distance : -player.transform.forward;
+            float reach = Mathf.Lerp(PushNear, PushFar, distance / PushRadius);
+            Vector3 push = away * (reach * PushWane / PushSpeed);
+            if (player.m_pushForce.sqrMagnitude < push.sqrMagnitude)
+            {
+                player.m_pushForce = push;
+            }
+            TwinsLog.Event($"{TwinsLog.Name(player)} is pushed back by the {TwinsLog.Name(m_boss)}'s burst: {distance:0.#} m from it, about {reach:0.#} m.");
+        }
+
+        // On the owner's game, as its phase comes: its arms go up ArmsBefore its end (the animation is sent to every game)
+        private void RaiseArms()
+        {
+            if (m_armsUp || Progress < 1f - ArmsBefore / TransitionTime)
+            {
+                return;
+            }
+            m_armsUp = true;
+            if (m_animation)
+            {
+                m_animation.SetTrigger(ArmsAnimation);
+            }
+        }
+
+        // On the owner's game, as its phase has come: the storm strikes the Stormcaller (networked)
+        private void Come()
+        {
+            m_armsUp = false;
+            TwinsLog.Event($"{TwinsLog.Name(m_boss)}'s second phase has come.");
             if (m_boss.Element == Element.Storm)
             {
-                // The storm strikes it (networked); its shards grow on every game
                 if (Storms.Strike)
                 {
                     StrikeLightning.SetLevel(Instantiate(Storms.Strike, transform.position, Quaternion.identity), LookLevel);
@@ -221,6 +378,33 @@ namespace NhxMagicWeapons.Bosses
                     StaffEffects.Create(new[] { Storms.Crackle }, m_humanoid.GetCenterPoint(), Quaternion.identity);
                 }
             }
+        }
+
+        // Its twin fell (TwinsBond.Fell, on its owner's game): alone, its second phase comes now, whatever its health,
+        // with its transition and its line, as at half its health
+        internal void TwinFell()
+        {
+            if (m_nview && m_nview.IsValid() && m_nview.IsOwner() && m_humanoid && !m_humanoid.IsDead() && !Enraged)
+            {
+                Enrage("its twin fell");
+            }
+        }
+
+        private void Enrage(string why)
+        {
+            ZDO zdo = m_nview.GetZDO();
+            zdo.Set(s_enragedKey, true);
+            zdo.Set(s_enragedAtKey, Now);
+            TwinsLog.Event($"{TwinsLog.Name(m_boss)} enters its second phase at {100f * m_humanoid.GetHealthPercentage():0}% health{(why != null ? $" ({why})" : "")}.");
+            // Its line (the user's recordings: TwinsVoices), queued behind its twin's if both come at once; a raised twin's
+            // goes ahead of those waiting, after the one playing
+            bool raised = m_raised;
+            m_raised = false;
+            TwinsVoices.Say(m_boss.Element == Element.Storm ? TwinsVoices.BlueP2 : TwinsVoices.RedP2, transform.position,
+                $"the {TwinsLog.Name(m_boss)} enters its second phase{(raised ? ", raised" : "")}", raised);
+            m_nextSpell = Time.time + TransitionTime + FirstAfter;
+            m_coming = true;
+            m_armsUp = false;
         }
 
         private void UpdateStorm()
@@ -258,7 +442,8 @@ namespace NhxMagicWeapons.Bosses
                 }
                 return;
             }
-            if (Time.time < m_nextSpell || m_humanoid.InAttack())
+            float interval = m_boss.m_role == CallerBoss.Role.Watcher ? WatcherCometInterval : CometInterval;
+            if (Time.time < m_nextSpell || Time.time < m_lastComet + interval || m_humanoid.InAttack())
             {
                 return;
             }
@@ -268,7 +453,7 @@ namespace NhxMagicWeapons.Bosses
                 m_nextSpell = Time.time + RetryAfter;
                 return;
             }
-            m_nextSpell = Time.time + CometInterval;
+            m_lastComet = Time.time;
             m_aim = LightningStrike.Ground(other.transform.position);
             m_windup = CometWindup;
             m_flameTimer = 0f;
@@ -325,7 +510,8 @@ namespace NhxMagicWeapons.Bosses
             Vector3 along = length > 0.01f ? path / length : dir;
             foreach (Player player in Player.GetAllPlayers())
             {
-                if (!player || player.IsDead())
+                // Those in its fight: who watches from outside the ring isn't touched (TwinsRing)
+                if (!player || player.IsDead() || !TwinsRing.Inside(m_boss, player.transform.position))
                 {
                     continue;
                 }
@@ -350,7 +536,8 @@ namespace NhxMagicWeapons.Bosses
         }
 
         // Whom its phase's spell goes to: watching, its one player; hunting, its twin's quarry if that isn't its own, or
-        // the nearest other player in the fight; none, nobody
+        // the nearest other player in the fight, or, its twin fallen and no other player there, its own quarry (until the
+        // redesign a lone hunter facing one player never cast it); none, nobody
         private Player OtherPlayer()
         {
             Character mine = m_boss.m_target;
@@ -382,13 +569,17 @@ namespace NhxMagicWeapons.Bosses
                     nearest = player;
                 }
             }
+            if (!nearest && mine is Player quarry && Fighter(quarry) && TwinsBond.Alone(m_boss))
+            {
+                return quarry;
+            }
             return nearest;
         }
 
         // A living player in this fight the elements haven't judged
         private bool Fighter(Player player)
         {
-            return player && !player.IsDead() && !Judged(player) && TwinsAI.InReach(m_boss, player);
+            return player && !player.IsDead() && !Judged(player) && TwinsRing.Inside(m_boss, player.transform.position);
         }
 
         private static bool Judged(Player player)
@@ -418,13 +609,14 @@ namespace NhxMagicWeapons.Bosses
             UpdateLink(player, dt);
         }
 
-        // The Stormcaller's arcs between players too close to each other
+        // The Stormcaller's arcs between players too close to each other, from its burst on: not while its phase comes, when
+        // it does nothing (the user, 2026-11-16: "yes, start it at the burst"; until then they began with its coming)
         private static void UpdateLink(Player player, float dt)
         {
             CallerBoss.NearestLiving(player.transform.position, Element.Storm, out CallerBoss storm);
             TwinsPhase phase = storm ? storm.m_phase : null;
             s_partners.Clear();
-            if (phase && phase.Enraged && InStormFight(storm, player))
+            if (phase && phase.Enraged && !phase.Transforming && InStormFight(storm, player))
             {
                 Vector3 center = player.GetCenterPoint();
                 foreach (Player other in Player.GetAllPlayers())
@@ -466,12 +658,12 @@ namespace NhxMagicWeapons.Bosses
             s_partners.Clear();
         }
 
-        // A player the Stormcaller's arcs reach: within LinkFightRadius of it, or anywhere in its arena's ring (the ring is
-        // wider than that from edge to edge; the user, 2026-11-15: "entering the ring during a fight should place the
-        // player in combat, being then affected by anything that entails")
+        // A player the Stormcaller's arcs reach: one in its fight (TwinsRing: anywhere in its arena's ring; the user,
+        // 2026-11-15: "entering the ring during a fight should place the player in combat, being then affected by
+        // anything that entails")
         private static bool InStormFight(CallerBoss storm, Player player)
         {
-            return Vector3.Distance(player.transform.position, storm.transform.position) <= LinkFightRadius || TwinsAI.InReach(storm, player);
+            return TwinsRing.Inside(storm, player.transform.position);
         }
 
         // `share` of the player's health as the element, lessened by their resistance to it; no stagger, no push
