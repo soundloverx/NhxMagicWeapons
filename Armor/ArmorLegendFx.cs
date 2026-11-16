@@ -54,9 +54,12 @@ namespace NhxMagicWeapons.Armor
         private const float ShardSpinSpeed = 90f;
         private const float ShardSize = 0.09f;
         // The Stormcaller boss's second phase (Bosses\TwinsPhase; the user, 2026-11-15, of Claude's pick with "the shards
-        // as its look": "go with your pick"): its shards, already there at level 20, grow over RageGrow seconds to this
-        // many times wider an orbit, faster, bigger, and arc this much more often
+        // as its look": "go with your pick"): its shards, already there at level 20, grow to this many times wider an
+        // orbit, bigger, and arc this much more often, as the boss grows into it (2026-11-16: over its coming, or within
+        // RageGrow seconds for a game that finds it come); then, as it has come, race round this much faster within
+        // RaceGrow seconds
         private const float RageGrow = 2f;
+        private const float RaceGrow = 0.5f;
         private const float RageRadius = 0.8f;
         private const float RageSpeed = 2f;
         private const float RageSize = 1.2f;
@@ -102,7 +105,7 @@ namespace NhxMagicWeapons.Armor
             }
         }
 
-        // A particle system following a bone: at an offset in the wearer's frame, or a point in the bone's space
+        // A particle system following a bone: at an offset in the wearer's frame (at a player's size), or a point in the bone's space
         private class Emitter
         {
             public ParticleSystem m_particles;
@@ -138,10 +141,11 @@ namespace NhxMagicWeapons.Armor
         private bool m_signature;
         private float m_arcTimer;
         private float m_orbit;
-        // The wearer's size (Build)
+        // The wearer's size (Build; then every frame, as a twin grows into its second phase: LateUpdate)
         private float m_size = 1f;
-        // How far into a boss's second phase its shards are (0 to 1)
+        // How far into a boss's second phase its shards are (0 to 1), and how far into their race
         private float m_rage;
+        private float m_race;
 
         private void Awake()
         {
@@ -229,20 +233,24 @@ namespace NhxMagicWeapons.Armor
             {
                 return;
             }
+            // What's under the root grows with the wearer by itself (its scale); what's placed in the world, by this
+            m_size = Mathf.Max(0.01f, m_wearer.transform.localScale.y);
             Quaternion facing = m_wearer.transform.rotation;
             foreach (Emitter emitter in m_particles)
             {
-                Follow(emitter, facing);
+                Follow(emitter, facing, m_size);
             }
             foreach (Emitter emitter in m_eyeFlames)
             {
-                Follow(emitter, facing);
+                Follow(emitter, facing, m_size);
             }
             if (m_shards != null && m_signature && m_bones.TryGetValue("Spine2", out Transform chest))
             {
-                m_rage = Mathf.MoveTowards(m_rage, Bosses.TwinsPhase.IsEnraged(m_wearer) ? 1f : 0f, Time.deltaTime / RageGrow);
+                float progress = Bosses.TwinsPhase.ProgressOf(m_wearer);
+                m_rage = Mathf.MoveTowards(m_rage, progress, Time.deltaTime / RageGrow);
+                m_race = Mathf.MoveTowards(m_race, progress >= 1f ? 1f : 0f, Time.deltaTime / RaceGrow);
                 float rage = Mathf.SmoothStep(0f, 1f, m_rage);
-                m_orbit += ShardOrbitSpeed * (1f + RageSpeed * rage) * Time.deltaTime;
+                m_orbit += ShardOrbitSpeed * (1f + RageSpeed * Mathf.SmoothStep(0f, 1f, m_race)) * Time.deltaTime;
                 Vector3 center = chest.position + Vector3.up * ShardHeight * m_size;
                 float radius = ShardRadius * (1f + RageRadius * rage);
                 Vector3 grown = Vector3.one * (1f + RageSize * rage);
@@ -260,7 +268,8 @@ namespace NhxMagicWeapons.Armor
             }
         }
 
-        private static void Follow(Emitter emitter, Quaternion facing)
+        // An offset in the bone's space grows with the bone; one in the wearer's frame, by the wearer's size
+        private static void Follow(Emitter emitter, Quaternion facing, float size)
         {
             if (!emitter.m_bone || !emitter.m_particles)
             {
@@ -273,7 +282,7 @@ namespace NhxMagicWeapons.Armor
             }
             else
             {
-                t.SetPositionAndRotation(emitter.m_bone.position + facing * emitter.m_offset, facing);
+                t.SetPositionAndRotation(emitter.m_bone.position + facing * (emitter.m_offset * size), facing);
             }
         }
 
@@ -361,9 +370,8 @@ namespace NhxMagicWeapons.Armor
                 }
                 return;
             }
-            // An offset in the bone's space grows with the bone; one in the wearer's frame, by the wearer's size
-            Vector3 offset = inBone ? spot.m_offset : spot.m_offset * m_size;
-            Emitter emitter = new Emitter { m_particles = particles, m_bone = bone, m_offset = offset, m_inBone = inBone, m_rate = spot.m_rate, m_perMeter = spot.m_perMeter };
+            // Its offset at a player's size (Follow)
+            Emitter emitter = new Emitter { m_particles = particles, m_bone = bone, m_offset = spot.m_offset, m_inBone = inBone, m_rate = spot.m_rate, m_perMeter = spot.m_perMeter };
             SetRate(emitter, 0f);
             m_particles.Add(emitter);
         }

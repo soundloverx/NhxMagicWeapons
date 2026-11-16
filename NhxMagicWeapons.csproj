@@ -138,6 +138,7 @@
     <Compile Include="Bosses\SmiteWeakness.cs" />
     <Compile Include="Bosses\ElementRune.cs" />
     <Compile Include="Bosses\Looks.cs" />
+    <Compile Include="Bosses\PhaseRunes.cs" />
     <Compile Include="Bosses\Showroom.cs" />
     <Compile Include="Bosses\TwinsAltars.cs" />
     <Compile Include="Bosses\TwinsItems.cs" />

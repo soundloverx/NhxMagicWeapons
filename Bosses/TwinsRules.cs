@@ -10,7 +10,8 @@ namespace NhxMagicWeapons.Bosses
     //   VisEquipment), so tames, summons, traps, bombs and the rest do nothing; so do players with anything else, who
     //   are being judged anyway (TwinsJudgment). Every hit of the staves' spells is the caster's (chains, blasts, tendrils,
     //   the storm, Lightning Step, the comet); burning goes past this (SE_Burning applies its damage itself), as it
-    //   should, the staves' fire burning on. devcommands' killall (one hit of 10^10, from no one) still kills them
+    //   should, the staves' fire burning on, but waits while a twin's second phase comes (BurningWaits).
+    //   devcommands' killall (one hit of 10^10, from no one) still kills them
     // - A fight left is lost (the user: "Can the bosses just despawn and require re-summon instead of just healing?"): with
     //   no living player in the fight (TwinsRing.Inside) for Abandon seconds, the twins go, each in a flash of its rune.
     //   Abandon was 30 s; the redesign (agreed with the user 2026-11-15, its change 5) makes it 5: "The twins withdraw
@@ -151,10 +152,15 @@ namespace NhxMagicWeapons.Bosses
                     hit.m_damage.m_pierce = 0f;
                 }
                 CallerBoss twin = CallerBoss.Of(__instance);
-                // Untouchable as its second phase comes (TwinsPhase)
+                // Untouchable as its second phase comes (TwinsPhase), its ward showing where a hit from its fight landed
+                // (the user, 2026-11-16, of Claude's extras: "I want all the extras")
                 if (twin && twin.m_phase && twin.m_phase.Transforming)
                 {
                     TwinsLog.Refuse(__instance, "entering its second phase");
+                    if (TwinsRing.Inside(twin, player.transform.position))
+                    {
+                        twin.Ward(hit.m_point, player);
+                    }
                     return false;
                 }
                 if (twin && !TwinsRing.Inside(twin, player.transform.position))
@@ -171,6 +177,19 @@ namespace NhxMagicWeapons.Bosses
                     return false;
                 }
                 return true;
+            }
+        }
+
+        // A twin's burning waits while its second phase comes (TwinsPhase), untouchable: its timer, its next tick and the
+        // damage it has left all held, so it goes on where it was once the phase has come (the user, 2026-11-16, of
+        // Claude's audit: "Apply fixes for #1 and #3"). Burning applies its damage itself, past StavesOnly
+        [HarmonyPatch(typeof(SE_Burning), nameof(SE_Burning.UpdateStatusEffect))]
+        private static class BurningWaits
+        {
+            private static bool Prefix(SE_Burning __instance)
+            {
+                CallerBoss twin = CallerBoss.Of(__instance.m_character);
+                return !(twin && twin.m_phase && twin.m_phase.Transforming);
             }
         }
     }

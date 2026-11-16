@@ -92,7 +92,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         }
 
         private Character m_wearer;
-        // The wearer's size: a player's 1, the Firecaller boss's 2 (Bosses\TwinsPhase holds them up in its second phase)
+        // The wearer's size: a player's 1, the Firecaller boss's 2 (Bosses\TwinsPhase holds them up in its second phase,
+        // growing to 2.5 as it comes: so every frame)
         private float m_scale = 1f;
         private Transform m_chest;
         private BeamLook m_look;
@@ -104,6 +105,11 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         private MaterialPropertyBlock m_block;
         private int m_heldFrame = -1;
         private bool m_wasHeld;
+        // How far they're held open this frame (Hold's `unfold`), whether they were held only partway last frame, and
+        // whether they're bursting the rest of the way from there
+        private float m_unfold = 1f;
+        private bool m_heldPartly;
+        private bool m_fromPartly;
         private float m_flareIn;
         private float m_burst;
         // How far through opening they are (0 to 1), how far they're spread, and how bright
@@ -119,8 +125,10 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
         private bool m_shown = true;
 
         // Called every frame the wearer's wings are up (`open`), with how much their channel's last hit still flares (1
-        // at the hit). Not called, or not open: they fold
-        internal static void Hold(Character wearer, bool open, float flare)
+        // at the hit). Not called, or not open: they fold. `unfold` below 1 holds them only that far open, following it
+        // steadily without their burst (a Firecaller boss's second phase coming: Bosses\TwinsPhase); back at 1, they
+        // burst the rest of the way
+        internal static void Hold(Character wearer, bool open, float flare, float unfold = 1f)
         {
             if (!wearer || SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
             {
@@ -138,6 +146,8 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
             }
             if (open)
             {
+                // Held by more than one this frame: as far open as the most
+                wings.m_unfold = wings.m_heldFrame == Time.frameCount ? Mathf.Max(wings.m_unfold, unfold) : unfold;
                 wings.m_heldFrame = Time.frameCount;
                 wings.m_flareIn = Mathf.Max(wings.m_flareIn, flare);
             }
@@ -257,10 +267,27 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
                 return;
             }
             float dt = Time.deltaTime;
+            // The wearer's size, as it is now
+            m_scale = Mathf.Max(0.01f, m_wearer.transform.localScale.y);
+            m_light.range = LightRange * m_scale;
             bool held = m_heldFrame == Time.frameCount;
-            bool opened = held && !m_wasHeld;
+            bool partly = held && m_unfold < 1f;
+            // Bursting open: held again, or held all the way after partway
+            bool opened = held && !partly && (!m_wasHeld || m_heldPartly);
+            if (opened)
+            {
+                m_fromPartly = m_heldPartly;
+            }
             m_wasHeld = held;
-            if (held)
+            m_heldPartly = partly;
+            if (partly)
+            {
+                // Partway, steadily, to however far they're held
+                m_spread = Mathf.MoveTowards(m_spread, Mathf.Max(0f, m_unfold), dt / UnfurlTime);
+                m_open = m_spread;
+                m_alpha = Mathf.Clamp01(m_spread * 3f);
+            }
+            else if (held)
             {
                 if (opened)
                 {
@@ -271,7 +298,13 @@ namespace NhxMagicWeapons.Staves.WrathOfMuspelheim.Effects
                 // They burst open: nearly spread within a third of the time, a little past it, then settling
                 m_open = Mathf.MoveTowards(m_open, 1f, dt / UnfurlTime);
                 m_spread = EaseOutBack(m_open);
-                m_alpha = Mathf.Clamp01(m_open * 3f);
+                // From partway, no dimmer than they were as they burst
+                float alpha = Mathf.Clamp01(m_open * 3f);
+                m_alpha = m_fromPartly ? Mathf.Max(m_alpha, alpha) : alpha;
+                if (m_open >= 1f)
+                {
+                    m_fromPartly = false;
+                }
             }
             else
             {

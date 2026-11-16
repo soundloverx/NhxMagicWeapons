@@ -89,8 +89,9 @@ namespace NhxMagicWeapons.Bosses
             Draw(0f);
         }
 
-        // A square across its facing, one unit from its middle to each side, the whole texture on it: made once
-        private static Mesh Quad()
+        // A square across its facing, one unit from its middle to each side, the whole texture on it: made once (also
+        // PhaseRunes')
+        internal static Mesh Quad()
         {
             if (!s_quad)
             {

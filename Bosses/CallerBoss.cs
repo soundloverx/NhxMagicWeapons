@@ -288,6 +288,14 @@ namespace NhxMagicWeapons.Bosses
                 m_outOfReach = 0f;
                 return;
             }
+            // Standing for its second phase's coming or its comet's warning (TwinsPhase.Busy), it can't rush: the time
+            // isn't counted and no rush is tried, so none is spent (with its RushCooldown) on a rush that can't happen.
+            // Claude's audit, 2026-11-16, applied at the user's word ("Apply fixes for #1 and #3"): once the coming
+            // took 5 s, a quarry kept out of reach through it cost the twin its chase for up to 10 s after
+            if (m_phase && m_phase.Busy(out _))
+            {
+                return;
+            }
             float reach = Element == Element.Fire ? FireReach : StormReach;
             if (Vector3.Distance(target.transform.position, transform.position) <= reach)
             {
@@ -389,8 +397,9 @@ namespace NhxMagicWeapons.Bosses
         // It lands this far short of its rune's middle (meters): on the rune, not on a player who stayed there
         private const float AnswerGap = 1.5f;
 
-        // Its own element's staff struck it at `point`, to nothing (TwinsRules.StavesOnly, on its owner's game): its ward
-        // flashes there on every game (WardFlash), so whoever struck sees why no number came
+        // Its own element's staff struck it at `point`, to nothing, or any staff as its second phase comes
+        // (TwinsRules.StavesOnly, on its owner's game): its ward flashes there on every game (WardFlash), so whoever struck
+        // sees why no number came
         internal void Ward(Vector3 point, Character attacker)
         {
             if (Time.time - m_lastWard < WardEvery || !m_nview || !m_nview.IsValid() || !m_humanoid)

@@ -163,7 +163,8 @@ namespace NhxMagicWeapons.Bosses
 
         private static long Now => ZNet.instance ? ZNet.instance.GetTime().Ticks : 0L;
 
-        // A raised twin comes back at half its health (CallerBoss.Start, on its owner's game)
+        // A raised twin comes back at half its health (CallerBoss.Start, on its owner's game), so in its second phase, its
+        // line first (TwinsPhase.Raised)
         internal static void OnStart(CallerBoss boss)
         {
             ZDO zdo = boss.m_nview.GetZDO();
@@ -171,6 +172,10 @@ namespace NhxMagicWeapons.Bosses
             {
                 zdo.Set(s_raisedKey, false);
                 boss.m_humanoid.SetHealth(boss.m_humanoid.GetMaxHealth() * RaisedHealth);
+                if (boss.m_phase)
+                {
+                    boss.m_phase.Raised();
+                }
             }
         }
 

@@ -23,7 +23,9 @@ namespace NhxMagicWeapons.Bosses
     // - blue-busy, red-busy: the Stormcaller, the Firecaller fallen, as the rune that will raise it appears (TwinsBond.Fell)
     // - blue-p2, red-p2: the Stormcaller, the Firecaller entering its second phase (TwinsPhase.Enrage), a raised twin too
     //   (it comes back in it). The user, 2026-11-15: "They shouldn't overlap, so maybe queue the 2 sounds if they happen
-    //   at the same time": as every line, the second waits for the first
+    //   at the same time": as every line, the second waits for the first. A raised twin's comes first (the user,
+    //   2026-11-16: "the voice line gaining priority over anything else when the boss resurrects, but without stopping
+    //   voice lines already in progress"): as the judgment's, after the line playing and ahead of those waiting
     // - the taunts: a twin turning to a player whose name starts with "dodo" or "dovah" (any case; the character's
     //   name). Turning to a player is a new target or starting to hunt them (TwinsAI): alone, a player only changes the
     //   twins' roles, at each swap. At first only the Stormcaller to "dodo" (blue-dodo) and the Firecaller to "dovah"
@@ -82,9 +84,10 @@ namespace NhxMagicWeapons.Bosses
     // - blue-judgement: a player judged (TwinsJudgment: anything but the two staves still held as the warning ends; the
     //   user, 2026-11-16: "for when a player is judged and killed for wielding the wrong weapon/tool [...] It should gain
     //   priority over any other voice line if judgement happens"). Said by the judged player's game as the sentence
-    //   falls (the beams kill them in 2 s). It comes before every other line (RPC_Voice): it waits for the line playing
+    //   falls (the beams kill them in 2 s). It comes before every other line (Hear): it waits for the line playing
     //   (at first it cut it short; the user, 2026-11-16: "It's ok if we wait for previous sounds to finish (not the
-    //   music, of course)"), and goes ahead of those waiting, which follow it if MaxWait allows. And the judged player's
+    //   music, of course)"), and goes ahead of those waiting, which follow it if MaxWait allows; behind a line that came
+    //   first before it (a raised twin's), if one waits still: the first of those to come is the first said. And the judged player's
     //   death has no kill line (PlayerDeath), the judgment having spoken of it (the next death gets the one it would have
     //   had)
     // Whoever decides says it to every game (a routed RPC), and each game whose player is within HearRange of where it
@@ -96,7 +99,7 @@ namespace NhxMagicWeapons.Bosses
     // twin's impatient line, kills in a wipe: blue-kill, red-kill, then nothing; two players judged together: one
     // judgment line). The game that decided still counts it as said (a dropped blue-kill still makes the next death's
     // red-kill). A line the DLL hasn't is a line that isn't said.
-    // both-defeat drops what waits as it comes (RPC_Voice; Claude's finding, 2026-11-16, fixed at the user's word): the
+    // both-defeat drops what waits as it comes (Hear; Claude's finding, 2026-11-16, fixed at the user's word): the
     // second twin killed a moment after the first, its twin's busy line (4 to 5 s since that day's recordings) and its
     // own second phase's were still to be said, so the twins' last words came up to 8 s late, after a dead twin's
     // line, or with a kill line waiting too, past MaxWait and not at all. The line playing is left to end
@@ -120,6 +123,8 @@ namespace NhxMagicWeapons.Bosses
         private static readonly string[] Kills = { "blue-kill", "red-kill" };
 
         private const string VoiceRpc = "NhxTwinsVoice";
+        // A line that goes ahead of those waiting (Say's `first`)
+        private const string FirstVoiceRpc = "NhxTwinsVoiceFirst";
         private const string KillRpc = "NhxTwinsKill";
         // As the fight's messages (TwinsBond.TellRange): anyone in the ring hears them
         private const float HearRange = TwinsBond.TellRange;
@@ -159,7 +164,8 @@ namespace NhxMagicWeapons.Bosses
         private static readonly Dictionary<string, AudioClip> s_clips = new Dictionary<string, AudioClip>();
         // Each pairing's lines in the DLL (Lines), found once
         private static readonly Dictionary<string, List<string>> s_lines = new Dictionary<string, List<string>>();
-        private static readonly Queue<KeyValuePair<string, float>> s_queue = new Queue<KeyValuePair<string, float>>();
+        // The lines waiting, in the order they'll be said: those that come first at the front (Hear)
+        private static readonly List<Waiting> s_queue = new List<Waiting>();
         // When this game last took each line (Time.time): FileCooldown
         private static readonly Dictionary<string, float> s_lastTaken = new Dictionary<string, float>();
         private static AudioSource s_source;
@@ -172,15 +178,23 @@ namespace NhxMagicWeapons.Bosses
 
         private static long Now => ZNet.instance ? ZNet.instance.GetTime().Ticks : 0L;
 
+        // A line waiting its turn: since when (Time.time), and whether it goes ahead of the others
+        private struct Waiting
+        {
+            public string m_line;
+            public float m_since;
+            public bool m_first;
+        }
+
         // ---- Saying ----
 
-        // `line` for every player near `point`, `why` for the log
-        internal static void Say(string line, Vector3 point, string why)
+        // `line` for every player near `point`, `why` for the log; `first`: after the line playing, ahead of those waiting
+        internal static void Say(string line, Vector3 point, string why, bool first = false)
         {
-            TwinsLog.Event($"Says {line}: {why}.");
+            TwinsLog.Event($"Says {line}{(first ? " (first)" : "")}: {why}.");
             if (ZRoutedRpc.instance != null)
             {
-                ZRoutedRpc.instance.InvokeRoutedRPC(ZRoutedRpc.Everybody, VoiceRpc, line, point);
+                ZRoutedRpc.instance.InvokeRoutedRPC(ZRoutedRpc.Everybody, first ? FirstVoiceRpc : VoiceRpc, line, point);
             }
         }
 
@@ -478,14 +492,17 @@ namespace NhxMagicWeapons.Bosses
         {
             private static void Postfix()
             {
-                ZRoutedRpc.instance?.Register<string, Vector3>(VoiceRpc, RPC_Voice);
+                ZRoutedRpc.instance?.Register<string, Vector3>(VoiceRpc, (sender, line, point) => Hear(line, point, false));
+                ZRoutedRpc.instance?.Register<string, Vector3>(FirstVoiceRpc, (sender, line, point) => Hear(line, point, true));
             }
         }
 
         // ---- Hearing ----
 
-        private static void RPC_Voice(long sender, string line, Vector3 point)
+        // `line` said at `point` (the judgment's always first)
+        private static void Hear(string line, Vector3 point, bool first)
         {
+            first |= line == Judgment;
             Player player = Player.m_localPlayer;
             if (player)
             {
@@ -532,29 +549,39 @@ namespace NhxMagicWeapons.Bosses
             if (line == End && s_queue.Count > 0)
             {
                 List<string> dropped = new List<string>();
-                foreach (KeyValuePair<string, float> waits in s_queue)
+                foreach (Waiting waits in s_queue)
                 {
-                    dropped.Add(waits.Key);
+                    dropped.Add(waits.m_line);
                 }
                 TwinsLog.Event($"Heard {line}: the twins are beaten, so not saying {string.Join(", ", dropped)}.");
                 s_queue.Clear();
             }
             bool waiting = Busy();
             s_lastTaken[line] = Time.time;
-            s_queue.Enqueue(new KeyValuePair<string, float>(line, Time.time));
-            // Judged: the elements' sentence comes next, once the line playing is done, ahead of those waiting
-            if (line == Judgment && s_queue.Count > 1)
+            Waiting heard = new Waiting { m_line = line, m_since = Time.time, m_first = first };
+            // Judged, or a twin raised: it comes next, once the line playing is done, ahead of those waiting (behind one that
+            // came first before it)
+            int at = s_queue.Count;
+            if (first)
+            {
+                at = 0;
+                while (at < s_queue.Count && s_queue[at].m_first)
+                {
+                    at++;
+                }
+            }
+            if (at < s_queue.Count)
             {
                 List<string> behind = new List<string>();
-                for (int i = s_queue.Count - 1; i > 0; i--)
+                for (int i = at; i < s_queue.Count; i++)
                 {
-                    KeyValuePair<string, float> waits = s_queue.Dequeue();
-                    behind.Add(waits.Key);
-                    s_queue.Enqueue(waits);
+                    behind.Add(s_queue[i].m_line);
                 }
-                TwinsLog.Event($"Heard {line}: a player is judged, so it goes ahead of {string.Join(", ", behind)}.");
+                s_queue.Insert(at, heard);
+                TwinsLog.Event($"Heard {line}: {(line == Judgment ? "a player is judged" : "a twin is raised")}, so it goes ahead of {string.Join(", ", behind)}.");
                 return;
             }
+            s_queue.Add(heard);
             TwinsLog.Event(waiting ? $"Heard {line}, waiting its turn ({s_queue.Count} in line)." : $"Heard {line}.");
         }
 
@@ -575,11 +602,12 @@ namespace NhxMagicWeapons.Bosses
             {
                 return;
             }
-            KeyValuePair<string, float> next = s_queue.Dequeue();
-            float waited = Time.time - next.Value;
-            if (waited > MaxWait || !s_clips.TryGetValue(next.Key, out AudioClip clip))
+            Waiting next = s_queue[0];
+            s_queue.RemoveAt(0);
+            float waited = Time.time - next.m_since;
+            if (waited > MaxWait || !s_clips.TryGetValue(next.m_line, out AudioClip clip))
             {
-                TwinsLog.Event($"Dropped {next.Key}: it waited {waited:0.#} s (at most {MaxWait:0} s).");
+                TwinsLog.Event($"Dropped {next.m_line}: it waited {waited:0.#} s (at most {MaxWait:0} s).");
                 return;
             }
             if (!s_source)
@@ -598,7 +626,7 @@ namespace NhxMagicWeapons.Bosses
             s_source.clip = clip;
             s_source.volume = Volume;
             s_source.Play();
-            TwinsLog.Event(waited > 0.5f ? $"Playing {next.Key} ({clip.length:0.#} s), after waiting {waited:0.#} s." : $"Playing {next.Key} ({clip.length:0.#} s).");
+            TwinsLog.Event(waited > 0.5f ? $"Playing {next.m_line} ({clip.length:0.#} s), after waiting {waited:0.#} s." : $"Playing {next.m_line} ({clip.length:0.#} s).");
         }
 
         // ---- Loading ----

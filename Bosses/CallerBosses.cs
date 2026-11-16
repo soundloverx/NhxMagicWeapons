@@ -184,9 +184,15 @@ namespace NhxMagicWeapons.Bosses
             {
                 sync.m_syncPosition = monsterSync.m_syncPosition;
                 sync.m_syncRotation = monsterSync.m_syncRotation;
-                sync.m_syncScale = monsterSync.m_syncScale;
                 sync.m_syncBodyVelocity = monsterSync.m_syncBodyVelocity;
                 sync.m_characterParentSync = monsterSync.m_characterParentSync;
+            }
+            // Its size isn't sent: every game grows it from when its second phase began (TwinsPhase.Grow). Sent, the
+            // owner's grown size would also be kept as its size to load with (with ZNetView's m_syncInitialScale), and
+            // grown again
+            if (sync)
+            {
+                sync.m_syncScale = false;
             }
 
             // The body hidden: the armor alone, the hood's eyes glowing in it. Not a player's equipment any more, so no
