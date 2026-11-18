@@ -9,7 +9,7 @@ namespace NhxMagicWeapons.Bosses
     // - One test of who's in an altar's twins' fight (Inside): within the ring, ArenaRadius from its middle. Charges,
     //   targeting, the twins' spells, the hits they take, who keeps the fight alive: all ask it. Before the redesign
     //   three rules and six radii did (50 m from a twin to join, 80 to leave, 80 for the arcs, the ring with 2 m of
-    //   grace, 90 for the altar to be busy), around an edge that wasn't drawn. Twins without an arena (nhx_boss summon,
+    //   grace, 90 for the altar to be busy), around an edge that wasn't drawn. Twins without an arena (devcommands'
     //   spawn: for testing) keep one radius about each of them, FreeRadius
     // - It holds: whoever is inside is stopped at its edge, players (each on their own game, while they're in the fight:
     //   TwinsDuel) and twins (on the game that runs them), and whoever is outside walks in freely, so a player back from

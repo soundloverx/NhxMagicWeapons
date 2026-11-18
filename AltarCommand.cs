@@ -16,13 +16,16 @@ namespace NhxMagicWeapons
     //                          free again and its ground as it was (TwinsAltars.RPC_Remove)
     //   nhx_altar clean        clears the arena of the altar nearest you (within 150 m) of rocks, trees and other debris,
     //                          as placing one now does (for altars placed before)
+    //   nhx_altar list         every altar, nearest you first: standing and on the game's list of locations, standing
+    //                          but not on it (listed again if its zone is free), or on it with nothing standing
+    //                          (TwinsAltars.EnsureListed)
     //   nhx_altar showroom     the options for the altar, the arena's ring stones and the items, laid out ahead of you
     //                          (Bosses\Showroom: looks only, on this game)
     //   nhx_altar clear        removes them
     internal class AltarCommand : ConsoleCommand
     {
         public override string Name => "nhx_altar";
-        public override string Help => "place [force]|generate [n]|remove|clean|showroom|clear - the twins' altars";
+        public override string Help => "place [force]|generate [n]|remove|clean|list|showroom|clear - the twins' altars";
         public override bool IsCheat => true;
 
         public override void Run(string[] args, Terminal context)
@@ -53,6 +56,13 @@ namespace NhxMagicWeapons
                     {
                         TwinsAltars.RequestClean(player.transform.position);
                         context?.AddString("Asked the server to clear the nearest altar's arena.");
+                    }
+                    break;
+                case "list":
+                    if (player)
+                    {
+                        TwinsAltars.RequestList(player.transform.position);
+                        context?.AddString("Asked the server for the altars.");
                     }
                     break;
                 case "generate":

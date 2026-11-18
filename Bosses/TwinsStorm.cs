@@ -169,8 +169,7 @@ namespace NhxMagicWeapons.Bosses
             ElementRune rune = s_rainRune ? ElementRune.Create(s_rainRune, LightningStrike.Ground(point), RuneDelay, RuneRadius) : null;
             if (rune)
             {
-                rune.m_caster = m_caster;
-                rune.m_hit = Hit();
+                rune.SetHit(m_caster, Hit());
             }
             m_ticks++;
             m_nview.GetZDO().Set(s_tickKey, m_ticks);

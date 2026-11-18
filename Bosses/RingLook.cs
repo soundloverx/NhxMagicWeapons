@@ -46,6 +46,9 @@ namespace NhxMagicWeapons.Bosses
         private static readonly int s_tint = Shader.PropertyToID("_TintColor");
         private static Texture2D s_soft;
 
+        // Every altar's ring on this game (DrainTether finds the dais's crystals from its altar's)
+        internal static readonly System.Collections.Generic.List<RingLook> All = new System.Collections.Generic.List<RingLook>();
+
         private GameObject m_root;
         private MeshRenderer m_band;
         private MeshRenderer m_veil;
@@ -65,6 +68,10 @@ namespace NhxMagicWeapons.Bosses
                 enabled = false;
             }
         }
+
+        private void OnEnable() => All.Add(this);
+
+        private void OnDisable() => All.Remove(this);
 
         private void Update()
         {

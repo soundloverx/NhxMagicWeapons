@@ -96,6 +96,8 @@ namespace NhxMagicWeapons.Bosses
 
         // Whether the local player is in the twins' fight (TwinsJudgment: no attack there but the staves'; TwinsLog)
         internal static bool InFight => s_inFight;
+        // The last staff the local player drew in it (TwinsDrain)
+        internal static Element Drawn => s_drawn;
         // The element whose twin has fallen, if one has: silent (Silence)
         private static Element s_silent;
         // Each element's charge on the player, in stacks (by Element): building evenly while its staff is the last drawn,
@@ -154,6 +156,10 @@ namespace NhxMagicWeapons.Bosses
                 if (player && !player.GetComponent<ChargeLook>())
                 {
                     player.gameObject.AddComponent<ChargeLook>();
+                }
+                if (player && !player.GetComponent<DrainTether>())
+                {
+                    player.gameObject.AddComponent<DrainTether>();
                 }
             }
         }
@@ -243,6 +249,8 @@ namespace NhxMagicWeapons.Bosses
                     Drain(player, element, dt);
                 }
             }
+            // Only one staff in play among the players, and the altar drains them (the fight's change 8)
+            TwinsDrain.Update(player, twin, s_drawn, s_silent, dt);
         }
 
         // The drawn staff's charge builds, from wherever it is: a stack each StackInterval
@@ -354,6 +362,8 @@ namespace NhxMagicWeapons.Bosses
             if (was != Element.None)
             {
                 TwinsLog.Event($"{TwinsLog.Name(player)}: {ChargeName(was)} is silent no more (its twin is back){(s_drawn == was ? ": it builds again from none" : "")}.");
+                // Sharing a staff is drained again once its second phase has come
+                TwinsDrain.Risen(was);
             }
             if (silent != Element.None)
             {
@@ -570,6 +580,7 @@ namespace NhxMagicWeapons.Bosses
             s_smiteDamage = 0f;
             System.Array.Clear(s_mostStacks, 0, s_mostStacks.Length);
             System.Array.Clear(s_mostSteps, 0, s_mostSteps.Length);
+            TwinsDrain.StartFight();
             TwinsLog.StartFight();
         }
 
@@ -583,7 +594,7 @@ namespace NhxMagicWeapons.Bosses
             TwinsLog.Event($"Fight summary for {name}: {s_swaps} swaps, {s_takenBack} of them to a staff not yet clean (answered at once); "
                 + $"most stacks: Static {s_mostStacks[(int)Element.Storm]}, Scorch {s_mostStacks[(int)Element.Fire]}; "
                 + $"{s_smites} overload smites, {s_smiteDamage:0} before resistances and armor; "
-                + $"most steps: Stormstruck {s_mostSteps[(int)Element.Storm]}, Flamestruck {s_mostSteps[(int)Element.Fire]}.");
+                + $"most steps: Stormstruck {s_mostSteps[(int)Element.Storm]}, Flamestruck {s_mostSteps[(int)Element.Fire]}; {TwinsDrain.Summary()}.");
             TwinsLog.Event($"Fight summary for {name}: {TwinsLog.FightDamage()}.");
         }
 
@@ -620,6 +631,7 @@ namespace NhxMagicWeapons.Bosses
         private static void Leave(Player player)
         {
             TwinsLog.Event($"{(player ? TwinsLog.Name(player) : s_playerName)} leaves the fight{(player && player.IsDead() ? " (dead)" : "")}.");
+            TwinsDrain.Reset(player);
             Summarize();
             s_inFight = false;
             TwinsRing.HoldPlayer(false, Vector3.zero);

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using HarmonyLib;
 using Jotunn.Configs;
 using Jotunn.Entities;
@@ -188,6 +189,7 @@ namespace NhxMagicWeapons.Bosses
                 ZRoutedRpc.instance.Register<int>(GenerateRpc, RPC_Generate);
                 ZRoutedRpc.instance.Register<Vector3>(CleanRpc, RPC_Clean);
                 ZRoutedRpc.instance.Register<Vector3>(RemoveRpc, RPC_Remove);
+                ZRoutedRpc.instance.Register<Vector3>(ListRpc, RPC_List);
                 ZRoutedRpc.instance.Register<string>(ReportRpc, RPC_Report);
             }
         }
@@ -257,6 +259,8 @@ namespace NhxMagicWeapons.Bosses
                 why = "the altar isn't in the game (see the log).";
                 return false;
             }
+            // Altars standing unlisted listed first, so they're in the way
+            EnsureListed(out _);
             s_removed = "";
             List<ZoneSystem.LocationInstance> inWay = InTheWay(point);
             if (inWay.Count > 0)
@@ -288,7 +292,7 @@ namespace NhxMagicWeapons.Bosses
                 s_removed = $" Removed first: {string.Join("; ", removed)}.";
             }
             point.y = ZoneSystem.instance.GetGroundHeight(point, out float height) ? height : WorldGenerator.instance.GetHeight(point.x, point.z);
-            AccessTools.Method(typeof(ZoneSystem), "RegisterLocation").Invoke(ZoneSystem.instance, new object[] { location, point, true });
+            s_register.Invoke(ZoneSystem.instance, new object[] { location, point, true });
             GameObject proxy = Object.Instantiate(ZoneSystem.instance.m_locationProxyPrefab, point, Quaternion.Euler(0f, yaw, 0f));
             proxy.GetComponent<LocationProxy>().SetLocation(LocationName, Random.Range(0, 99999), true);
             s_cleared = ClearDebris(point);
@@ -369,10 +373,16 @@ namespace NhxMagicWeapons.Bosses
         {
             ZoneSystem zones = ZoneSystem.instance;
             Vector2s zone = ZoneSystem.GetZone(instance.m_position);
-            zones.m_locationInstances.Remove(zone);
-            Uncache(zones.m_locationIDCache, instance);
-            Uncache(zones.m_locationGroupCache, instance);
-            Uncache(zones.m_locationMaxGroupCache, instance);
+            // Out of the list if it's the one there: an altar standing unlisted, its zone another location's, leaves that
+            // one be (EnsureListed)
+            if (zones.m_locationInstances.TryGetValue(zone, out ZoneSystem.LocationInstance listed)
+                && listed.m_location.m_prefabName == instance.m_location.m_prefabName && Utils.DistanceXZ(listed.m_position, instance.m_position) < SameSpot)
+            {
+                zones.m_locationInstances.Remove(zone);
+                Uncache(zones.m_locationIDCache, instance);
+                Uncache(zones.m_locationGroupCache, instance);
+                Uncache(zones.m_locationMaxGroupCache, instance);
+            }
 
             int location = instance.m_location.m_prefab.Name.GetStableHashCode();
             int proxy = zones.m_locationProxyPrefab.name.GetStableHashCode();
@@ -524,21 +534,178 @@ namespace NhxMagicWeapons.Bosses
                 : $"The arena at {Where(altar.m_position)} is cleared: {ClearDebris(altar.m_position)} things removed.");
         }
 
-        // The altar nearest `point`, if one is within CleanReach
+        // The altar nearest `point`, if one is within CleanReach: one standing (EnsureListed: listed or not), or one the
+        // list has where nothing stands (remove takes it off the list), as the list would have it
         private static bool NearestAltar(Vector3 point, out ZoneSystem.LocationInstance altar)
         {
             altar = default;
             float nearest = float.PositiveInfinity;
-            foreach (ZoneSystem.LocationInstance instance in ZoneSystem.instance.GetLocationList())
+            ZoneSystem.ZoneLocation location = Location();
+            foreach (Altar found in EnsureListed(out _))
             {
-                float distance = Utils.DistanceXZ(instance.m_position, point);
-                if (instance.m_location.m_prefabName == LocationName && distance < nearest)
+                float distance = Utils.DistanceXZ(found.m_position, point);
+                if (location != null && distance < nearest)
                 {
                     nearest = distance;
-                    altar = instance;
+                    altar = new ZoneSystem.LocationInstance { m_location = location, m_position = found.m_position, m_placed = true };
                 }
             }
             return nearest <= CleanReach;
+        }
+
+        // ---- Altars standing, listed or not ----
+
+        // An altar standing in the world is its proxy, which every game builds its looks from (and the server holds them
+        // all); the game's list of locations (ZoneSystem.m_locationInstances) is what a lodestone (Game's
+        // RPC_DiscoverClosestLocation) and nhx_altar went by, and an altar can stand without being on it: the user,
+        // 2026-11-17, on a test world, "using the lodestone item doesn't detect any altar in the test map. And neither
+        // does "nhx_altar remove" when I'm just standing on top of the altar" (how it came off the list, nothing showed:
+        // the game drops a saved location it can't match without a word, and refuses one in a zone that has one). So the
+        // lodestone and nhx_altar go by what stands (Seek, NearestAltar, Generate), and the server lists again each altar
+        // standing that the list hasn't, if its zone holds no other location (a zone holds one), saying so in the log
+        // (EnsureListed). nhx_altar list shows what it found
+        private struct Altar
+        {
+            public Vector3 m_position;
+            // On the list (or just put back on it)
+            public bool m_listed;
+            public bool m_relisted;
+            // Standing, but its zone has another location on the list: what and where
+            public string m_zoneHeldBy;
+            // On the list, but nothing stands there
+            public bool m_ghost;
+        }
+
+        // A listed altar and a standing one this near (meters) are the same
+        private const float SameSpot = 1f;
+
+        private static readonly MethodInfo s_register = AccessTools.Method(typeof(ZoneSystem), "RegisterLocation");
+
+        // On the server: every altar standing, each the list hadn't listed now if its zone was free; and those the list has
+        // where nothing stands. `relisted`: how many were listed again
+        private static List<Altar> EnsureListed(out int relisted)
+        {
+            relisted = 0;
+            List<Altar> altars = new List<Altar>();
+            ZoneSystem zones = ZoneSystem.instance;
+            ZoneSystem.ZoneLocation location = Location();
+            if (!zones || location == null || ZDOMan.instance == null)
+            {
+                return altars;
+            }
+            int proxy = zones.m_locationProxyPrefab.name.GetStableHashCode();
+            int byName = LocationName.GetStableHashCode();
+            int byPrefab = location.Hash;
+            foreach (ZDO zdo in ZDOMan.instance.m_objectsByID.Values)
+            {
+                if (zdo == null || zdo.GetPrefab() != proxy)
+                {
+                    continue;
+                }
+                int which = zdo.GetInt(ZDOVars.s_location);
+                if (which != byName && which != byPrefab)
+                {
+                    continue;
+                }
+                Vector3 at = zdo.GetPosition();
+                Altar altar = new Altar { m_position = at };
+                Vector2s zone = ZoneSystem.GetZone(at);
+                if (zones.m_locationInstances.TryGetValue(zone, out ZoneSystem.LocationInstance listed))
+                {
+                    if (listed.m_location.m_prefabName == LocationName)
+                    {
+                        altar.m_listed = true;
+                    }
+                    else
+                    {
+                        altar.m_zoneHeldBy = $"{listed.m_location.m_prefabName} at {Where(listed.m_position)}";
+                        Plugin.Log.LogWarning($"The altar standing at {Where(at)} isn't in the game's list of locations, and can't be: its zone has {altar.m_zoneHeldBy}.");
+                    }
+                }
+                else
+                {
+                    s_register.Invoke(zones, new object[] { location, at, true });
+                    if (zones.m_locationInstances.ContainsKey(zone))
+                    {
+                        altar.m_listed = true;
+                        altar.m_relisted = true;
+                        relisted++;
+                        Plugin.Log.LogInfo($"The altar standing at {Where(at)} wasn't in the game's list of locations: it's listed again.");
+                    }
+                }
+                altars.Add(altar);
+            }
+            foreach (ZoneSystem.LocationInstance instance in zones.GetLocationList())
+            {
+                if (instance.m_location.m_prefabName == LocationName && !altars.Exists(a => !a.m_ghost && Utils.DistanceXZ(a.m_position, instance.m_position) < SameSpot))
+                {
+                    altars.Add(new Altar { m_position = instance.m_position, m_listed = true, m_ghost = true });
+                }
+            }
+            return altars;
+        }
+
+        // The lodestone, on the server: it pins the nearest altar standing, listed or not, rather than the game's nearest
+        // on its list (FindClosestLocation), which an altar standing unlisted isn't on. The game's answer as it gives it
+        [HarmonyPatch(typeof(Game), "RPC_DiscoverClosestLocation")]
+        private static class Seek
+        {
+            private static bool Prefix(long sender, string name, Vector3 point, string pinName, int pinType, bool showMap, bool discoverAll)
+            {
+                if (name != LocationName || discoverAll || !ZNet.instance || !ZNet.instance.IsServer())
+                {
+                    return true;
+                }
+                float nearest = float.PositiveInfinity;
+                Vector3 found = Vector3.zero;
+                foreach (Altar altar in EnsureListed(out _))
+                {
+                    float distance = Utils.DistanceXZ(altar.m_position, point);
+                    if (!altar.m_ghost && distance < nearest)
+                    {
+                        nearest = distance;
+                        found = altar.m_position;
+                    }
+                }
+                if (float.IsInfinity(nearest))
+                {
+                    Plugin.Log.LogInfo("A lodestone found no altar standing in the world.");
+                    return false;
+                }
+                Plugin.Log.LogInfo($"A lodestone found the altar at {Where(found)}, {nearest:0} m away.");
+                ZRoutedRpc.instance.InvokeRoutedRPC(sender, "RPC_DiscoverLocationResponse", pinName, pinType, found, showMap);
+                return false;
+            }
+        }
+
+        // An admin's ask for the altars: what stands and what the list has, nearest `point` first
+        internal static void RequestList(Vector3 point) => ZRoutedRpc.instance.InvokeRoutedRPC(ListRpc, point);
+
+        private const string ListRpc = "NhxAltarList";
+
+        private static void RPC_List(long sender, Vector3 point)
+        {
+            if (!ZNet.instance || !ZNet.instance.IsServer() || !IsAdmin(sender))
+            {
+                return;
+            }
+            List<Altar> altars = EnsureListed(out int relisted);
+            if (altars.Count == 0)
+            {
+                Report(sender, "No altar stands in the world, and none is listed.");
+                return;
+            }
+            altars.Sort((a, b) => Utils.DistanceXZ(a.m_position, point).CompareTo(Utils.DistanceXZ(b.m_position, point)));
+            List<string> lines = new List<string>();
+            foreach (Altar altar in altars)
+            {
+                string state = altar.m_ghost ? "listed, but nothing stands there (nhx_altar remove near it takes it off the list)"
+                    : altar.m_relisted ? "standing; it wasn't listed, and is now"
+                    : altar.m_listed ? "standing and listed"
+                    : $"standing, not listed: its zone has {altar.m_zoneHeldBy}";
+                lines.Add($"{Where(altar.m_position)}, {Utils.DistanceXZ(altar.m_position, point):0} m away: {state}");
+            }
+            Report(sender, $"Altars ({altars.Count}{(relisted > 0 ? $", {relisted} listed again" : "")}):\n" + string.Join("\n", lines));
         }
 
         // ---- Removing one ----
@@ -613,12 +780,13 @@ namespace NhxMagicWeapons.Bosses
             {
                 return "No altar: it isn't in the game (see the log).";
             }
+            // Those standing, listed or not (EnsureListed)
             List<Vector3> altars = new List<Vector3>();
-            foreach (ZoneSystem.LocationInstance instance in ZoneSystem.instance.GetLocationList())
+            foreach (Altar altar in EnsureListed(out _))
             {
-                if (instance.m_location.m_prefabName == LocationName)
+                if (!altar.m_ghost)
                 {
-                    altars.Add(instance.m_position);
+                    altars.Add(altar.m_position);
                 }
             }
             if (altars.Count >= wanted)

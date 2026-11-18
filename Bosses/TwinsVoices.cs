@@ -90,6 +90,12 @@ namespace NhxMagicWeapons.Bosses
     //   first before it (a raised twin's), if one waits still: the first of those to come is the first said. And the judged player's
     //   death has no kill line (PlayerDeath), the judgment having spoken of it (the next death gets the one it would have
     //   had)
+    // - blue-sharing, red-sharing: the twin whose staff nobody holds as the altar tethers players who all hold the other
+    //   (TwinsDrain, the fight's change 8; the user, 2026-11-17: "Stormcaller can cycle through "blue-sharing1.ogg" and
+    //   "blue-sharing2.ogg" for this event and Firecaller can cycle through "red-sharing1.ogg" and "red-sharing2.ogg""):
+    //   the tethered player's game asks the game that runs that twin (SharingRpc), which says its next one, from the
+    //   count it keeps; two players tethered together ask twice, and the second, within SharingGuard, is let go. As the
+    //   judgment's, ahead of those waiting: the drain doubles every 2 s
     // Whoever decides says it to every game (a routed RPC), and each game whose player is within HearRange of where it
     // happens plays it, as a voice in their ears (not from a place), through the game's interface sounds (which follow the
     // effects volume). A dead player hears from where they fell until they're back (their player is gone meanwhile). One
@@ -126,6 +132,9 @@ namespace NhxMagicWeapons.Bosses
         // A line that goes ahead of those waiting (Say's `first`)
         private const string FirstVoiceRpc = "NhxTwinsVoiceFirst";
         private const string KillRpc = "NhxTwinsKill";
+        private const string SharingRpc = "NhxTwinsSharing";
+        // A twin asked again this soon after its sharing line (seconds) lets it go: both players tethered at once
+        private const float SharingGuard = 5f;
         // As the fight's messages (TwinsBond.TellRange): anyone in the ring hears them
         private const float HearRange = TwinsBond.TellRange;
         private const float MaxWait = 10f;
@@ -161,6 +170,9 @@ namespace NhxMagicWeapons.Bosses
         private static readonly int s_dovahSaidKey = "nhx_twin_taunts_dovah".GetStableHashCode();
         // How many players' deaths a twin has spoken of: which kill line is next (the higher of the pair's)
         private static readonly int s_killsKey = "nhx_twins_kills".GetStableHashCode();
+        // How many sharing lines a twin has said (which is next), and when the last (ticks)
+        private static readonly int s_sharingSaidKey = "nhx_twin_sharing_said".GetStableHashCode();
+        private static readonly int s_sharingAtKey = "nhx_twin_sharing_at".GetStableHashCode();
         private static readonly Dictionary<string, AudioClip> s_clips = new Dictionary<string, AudioClip>();
         // Each pairing's lines in the DLL (Lines), found once
         private static readonly Dictionary<string, List<string>> s_lines = new Dictionary<string, List<string>>();
@@ -471,6 +483,43 @@ namespace NhxMagicWeapons.Bosses
         internal static void Register(CallerBoss boss)
         {
             boss.m_nview.Register<string, Vector3>(KillRpc, (sender, name, point) => Killed(boss, name, point));
+            boss.m_nview.Register<Vector3>(SharingRpc, (sender, point) => Shared(boss, point));
+        }
+
+        // The altar tethers `player`, who holds the same staff as everyone else in the fight, and `boss`, the twin whose
+        // staff nobody holds, complains of it (on the player's game: TwinsDrain)
+        internal static void Sharing(CallerBoss boss, Player player)
+        {
+            if (boss && boss.m_nview && boss.m_nview.IsValid() && player)
+            {
+                boss.m_nview.InvokeRPC(ZNetView.Everybody, SharingRpc, player.transform.position);
+            }
+        }
+
+        // On the game that runs it: its next sharing line, unless it said one within SharingGuard
+        private static void Shared(CallerBoss boss, Vector3 point)
+        {
+            if (!boss.m_nview || !boss.m_nview.IsValid() || !boss.m_nview.IsOwner())
+            {
+                return;
+            }
+            ZDO zdo = boss.m_nview.GetZDO();
+            long last = zdo.GetLong(s_sharingAtKey);
+            if (last != 0L && Now - last < TimeSpan.FromSeconds(SharingGuard).Ticks)
+            {
+                TwinsLog.Event($"{TwinsLog.Name(boss)}'s sharing line: said {TimeSpan.FromTicks(Now - last).TotalSeconds:0.#} s ago, not again.");
+                return;
+            }
+            List<string> lines = Lines(boss.Element == Element.Storm ? "blue-sharing" : "red-sharing");
+            if (lines.Count == 0)
+            {
+                TwinsLog.Event($"{TwinsLog.Name(boss)} has no sharing line in the DLL.");
+                return;
+            }
+            int said = zdo.GetInt(s_sharingSaidKey);
+            zdo.Set(s_sharingSaidKey, said + 1);
+            zdo.Set(s_sharingAtKey, Now);
+            Say(lines[said % lines.Count], point, $"{TwinsLog.Name(boss)}: the players share the other staff", true);
         }
 
         // A player named `name` died at `point` in this twin's fight: on the game that runs it, the next kill line

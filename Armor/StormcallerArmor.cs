@@ -163,7 +163,7 @@ namespace NhxMagicWeapons.Armor
                     return new PieceStats
                     {
                         Armor = 3, ArmorPerLevel = 1, EitrRegen = 0.12f, Durability = 1500, DurabilityPerLevel = 50,
-                        Weight = 4, Movement = 0.09f,
+                        Weight = 4, Movement = 0.1f,
                         Resistances = new[] { Resists(element, HitData.DamageModifier.Resistant) },
                     };
             }

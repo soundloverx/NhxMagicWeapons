@@ -16,9 +16,8 @@ namespace NhxMagicWeapons.Bosses
     // So for now: the player's own body and skeleton (the sets are skinned to the player's bones by name) with the body
     // hidden, wearing a set, twice a player's size; a monster's AI with its attacks (BossAttacks); bosses to the game
     // (their bars, their music: TwinsMusic), dropping nothing themselves (the pair's drops: TwinsBond.Won). Summon the pair
-    // at an altar (TwinsAltars) or with "nhx_boss summon" (linked: TwinsBond), or
-    // one with devcommands' "spawn NhxStormcallerBoss" / "spawn NhxFirecallerBoss"; nhx_boss also makes them follow you,
-    // stay, or change their armor's level (BossCommand). What makes them move as a big player is CallerBoss.
+    // at an altar (TwinsAltars; linked: TwinsBond), or one with devcommands' "spawn NhxStormcallerBoss" /
+    // "spawn NhxFirecallerBoss"; nhx_boss sets their armor's level or their health (BossCommand). What makes them move as a big player is CallerBoss.
     // The fight's core (the user, 2026-11-14: "build the core loop"): the elements building on players, the swaps and the
     // twins' roles (TwinsDuel, TwinsAI); they die together, or the survivor raises the other (TwinsBond). Built since:
     // only the two staves in hand (TwinsJudgment, TwinsRules); the altar, its arena and the lodestone (TwinsAltars,

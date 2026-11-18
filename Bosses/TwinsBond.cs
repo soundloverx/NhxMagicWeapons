@@ -16,7 +16,7 @@ namespace NhxMagicWeapons.Bosses
     // While its twin is down, the survivor fights alone (Alone; the fight's redesign, agreed with the user 2026-11-15, its
     // change 7): it enters its second phase at once, whatever its health (Fell: TwinsPhase.TwinFell), hunts whoever can
     // hurt it (TwinsAI), and its fallen twin's element is silent on the players (TwinsDuel.Silence).
-    // Summoned together (Summon: an altar's offering, or nhx_boss summon), they're linked, and an altar's twins know its
+    // Summoned together (Summon: an altar's offering), they're linked, and an altar's twins know its
     // arena (Arena: TwinsJudgment, TwinsRules). Twins spawned one by one (devcommands' spawn) aren't linked: they fight,
     // but alone, and drop nothing
     internal static class TwinsBond
@@ -32,7 +32,7 @@ namespace NhxMagicWeapons.Bosses
         internal const float TellRange = 100f;
 
         private const string FellRpc = "NhxTwinFell";
-        // Summoned (by an altar or nhx_boss summon): this far apart, each arriving in its element (its rune flashing)
+        // Summoned (by an altar): this far apart, each arriving in its element (its rune flashing)
         private const float SummonApart = 10f;
         private const float ArrivalRadius = 3f;
 

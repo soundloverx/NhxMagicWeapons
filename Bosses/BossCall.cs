@@ -28,8 +28,7 @@ namespace NhxMagicWeapons.Bosses
                 ElementRune rune = ElementRune.Create(m_rune, point, kind.m_delay, kind.m_radius);
                 if (rune)
                 {
-                    rune.m_caster = owner;
-                    rune.m_hit = hitData;
+                    rune.SetHit(owner, hitData);
                 }
             }
             Destroy(gameObject);

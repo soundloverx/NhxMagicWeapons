@@ -18,8 +18,14 @@ namespace NhxMagicWeapons.Bosses
     // the caster's friends takes the hit (LightningStrike.HitArea). Out of it in time, a player isn't touched.
     // With no delay and no caster, only its look, at once: the bosses' smites (TwinsDuel.Smite), whose damage comes apart.
     // Networked, so every game draws it (and each shows the blast itself: it isn't networked); the game that created it
-    // (the boss's: BossCall) strikes, deals the hit and removes it. Its caster and hit are only there. Its delay and size
-    // are in its ZDO, for the smites'
+    // (the boss's: BossCall) removes it. Its delay, size and hit are in its ZDO.
+    // Who it hits, each game judges for its own player (Claude's review, 2026-11-17, its #1, built at the user's word: "I
+    // would like to implement #1 [...] my latency is around 40ms to the server and my friend's is around 180ms"): the
+    // game that created it struck everything within it, as it saw them, and it saw the other player where they had been
+    // 0.2 s or more before, so a rune could hit them after they had left it on their screen. Now every game's rune strikes
+    // its delay after it appeared there, and hits that game's player if they're within it then and not rolling (HitLocal),
+    // with the hit the creating game wrote in its ZDO (SetHit): the warning they saw is the one they get, and where they
+    // stand is where they are. Nothing but players is hit any more (the arena's creatures are held: TwinsStasis)
     internal class ElementRune : MonoBehaviour
     {
         public bool m_fire;
@@ -35,6 +41,10 @@ namespace NhxMagicWeapons.Bosses
 
         private static readonly int s_delayKey = "nhx_rune_delay".GetStableHashCode();
         private static readonly int s_radiusKey = "nhx_rune_radius".GetStableHashCode();
+        // Its hit, as RPC_Damage sends one (HitData.Serialize), for every game to deal to its own player
+        private static readonly int s_hitKey = "nhx_rune_hit".GetStableHashCode();
+        // A player this much past its edge as it strikes is a near miss, for the log (meters)
+        private const float NearMiss = 1.5f;
 
         // The disc it's drawn on, as the sigil's: rings of vertices dropped onto the ground (within GroundReach up or down
         // of its middle) and lifted a little: 15 cm (6 at first, as the sigil's; the user, 2026-11-15: "The runes on the
@@ -92,6 +102,24 @@ namespace NhxMagicWeapons.Bosses
             return rune;
         }
 
+        // On the creating game, right after Create: the rune strikes for `caster`, with `hit`, on every game
+        internal void SetHit(Character caster, HitData hit)
+        {
+            m_caster = caster;
+            m_hit = hit;
+            if (hit == null || !m_nview || !m_nview.IsValid())
+            {
+                return;
+            }
+            if (caster)
+            {
+                hit.SetAttacker(caster);
+            }
+            ZPackage package = new ZPackage();
+            hit.Serialize(ref package);
+            m_nview.GetZDO().Set(s_hitKey, package.GetArray());
+        }
+
         private void Awake()
         {
             m_nview = GetComponent<ZNetView>();
@@ -146,7 +174,7 @@ namespace NhxMagicWeapons.Bosses
             Draw(dt);
         }
 
-        // The lightning or the blast, and the hit for everything within it (the creating game's)
+        // The lightning or the blast, and the hit for this game's player if they're within it
         private void Strike(bool owner)
         {
             Vector3 point = transform.position;
@@ -162,15 +190,64 @@ namespace NhxMagicWeapons.Bosses
             {
                 StrikeLightning.SetLevel(Instantiate(m_strike, point, Quaternion.identity), m_strikeLevel);
             }
-            // A caster gone (dead, or left) has no friends to spare: nothing is hit
-            if (!owner || !m_caster || m_caster.IsDead() || m_hit == null)
+            HitLocal(point);
+        }
+
+        // This game's player, if they're within it as it strikes here, and not rolling: its hit, on their own game
+        private void HitLocal(Vector3 point)
+        {
+            Player player = Player.m_localPlayer;
+            HitData hit = player && !player.IsDead() ? Hit() : null;
+            Character caster = hit != null ? hit.GetAttacker() : null;
+            // A look only (no hit), or a caster gone (dead, or left): nothing is hit
+            if (!caster || caster.IsDead())
             {
                 return;
             }
-            Vector3 dir = point - m_caster.transform.position;
+            Collider body = player.GetCollider();
+            if (!body)
+            {
+                return;
+            }
+            Vector3 closest = body.ClosestPoint(point);
+            float distance = Vector3.Distance(closest, point);
+            string rune = $"{TwinsLog.Name(caster)}'s {(m_fire ? "fire" : "storm")} rune ({m_radius:0.#} m)";
+            if (distance > m_radius)
+            {
+                if (distance <= m_radius + NearMiss)
+                {
+                    TwinsLog.Event($"{TwinsLog.Name(player)} is clear of {rune} by {distance - m_radius:0.0} m as it strikes.");
+                }
+                return;
+            }
+            // Rolling through it (StaffHits.IsValidTarget asks IsDodgeInvincible), or anything else that spares them
+            if (!StaffHits.IsValidTarget(caster, player))
+            {
+                TwinsLog.Event($"{TwinsLog.Name(player)} {(player.IsDodgeInvincible() ? "rolls through" : "is spared by")} {rune}, {m_radius - distance:0.0} m inside its edge.");
+                return;
+            }
+            Vector3 dir = point - caster.transform.position;
             dir.y = 0f;
-            dir = dir.sqrMagnitude > 0.01f ? dir.normalized : m_caster.transform.forward;
-            LightningStrike.HitArea(m_caster, m_hit, point, m_radius, dir);
+            dir = dir.sqrMagnitude > 0.01f ? dir.normalized : caster.transform.forward;
+            Vector3 away = closest - point;
+            away.y = 0f;
+            away = away.sqrMagnitude > 0.01f ? away.normalized : dir;
+            TwinsLog.Event($"{TwinsLog.Name(player)} is struck by {rune}, {m_radius - distance:0.0} m inside its edge.");
+            StaffHits.Damage(caster, hit, body, closest, away, out _);
+        }
+
+        // Its hit, from its ZDO (or as the creating game set it), or null for a rune that's only a look
+        private HitData Hit()
+        {
+            byte[] bytes = m_nview && m_nview.IsValid() ? m_nview.GetZDO().GetByteArray(s_hitKey) : null;
+            if (bytes != null && bytes.Length > 0)
+            {
+                ZPackage package = new ZPackage(bytes);
+                HitData hit = new HitData();
+                hit.Deserialize(ref package);
+                return hit;
+            }
+            return m_hit != null ? m_hit.Clone() : null;
         }
 
         // The sigil's three rings as additive materials, made once (also the stasis runes': TwinsStasis); null without them

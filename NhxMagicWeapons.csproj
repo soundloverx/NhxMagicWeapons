@@ -145,6 +145,8 @@
     <Compile Include="Bosses\TwinsAI.cs" />
     <Compile Include="Bosses\TwinsBond.cs" />
     <Compile Include="Bosses\TwinsDuel.cs" />
+    <Compile Include="Bosses\TwinsDrain.cs" />
+    <Compile Include="Bosses\DrainTether.cs" />
     <Compile Include="Bosses\TwinsJudgment.cs" />
     <Compile Include="Bosses\TwinsMusic.cs" />
     <Compile Include="Bosses\TwinsPhase.cs" />

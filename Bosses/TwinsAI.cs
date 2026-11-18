@@ -12,7 +12,8 @@ namespace NhxMagicWeapons.Bosses
     //   when both hold the same staff, the user's idea)
     // - Nobody holds its staff, one player: a watcher (the user: "Yes, I like the watcher"): it keeps back, casting only its
     //   telegraphed spell (BossAttacks.IsWatcherSpell) and half again as rarely; between spells it stands and watches its
-    //   player (no wandering about: IdleMovement)
+    //   player (no wandering about: IdleMovement), and when they keep hurting it, it flashes behind its hunting twin
+    //   (CallerBoss.Evade)
     // - Its twin fallen (TwinsBond.Alone): always a hunter, of whoever drew the fallen twin's staff last, the player who
     //   can hurt it (a staff cannot hurt its own caller: TwinsRules); with no such player, of who drew its own, or the
     //   nearest. The fight's redesign, agreed with the user 2026-11-15: alone with one player, the only staff that hurts
@@ -232,6 +233,12 @@ namespace NhxMagicWeapons.Bosses
             {
                 if (!__result || !CallerBoss.ByAI.TryGetValue(__instance, out CallerBoss boss) || !boss)
                 {
+                    return;
+                }
+                // Not before this game has taken up its timers, as it begins to run it (CallerBoss.Resume)
+                if (!boss.Running)
+                {
+                    __result = false;
                     return;
                 }
                 // Standing for its phase's coming or its comet's warning: nothing else (TwinsPhase)

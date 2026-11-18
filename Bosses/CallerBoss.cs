@@ -57,6 +57,19 @@ namespace NhxMagicWeapons.Bosses
         // Where a chasing Stormcaller lands: well within its bolt's reach, not at arm's length (a caster; the Firecaller, and
         // both when punishing a swap, land at ArriveGap)
         private const float StormChaseGap = 12f;
+        // A watcher the player keeps hurting flashes behind its hunting twin (Claude's review, 2026-11-17, its #4, built at
+        // the user's word: "go ahead with 4% and 8s, both twins"): alone with one player, the twin they can hurt stood still
+        // between its spells, and the staves hit at once, so their half of the fight asked nothing of them. Once it has
+        // lost FlashShare of its health since its last flash (or since it began to watch), at most every FlashCooldown, and
+        // not while it attacks, stands for its second phase or its comet, or answers a swap, it flashes (its rush) to
+        // FlashBehind beyond its twin on the line from the player, no further than FlashMaxFromPlayer from them: the twin
+        // chasing them can't be hurt by their staff and stops shots aimed through it, so they have to move, or drag it
+        // aside, to have the watcher in sight again. A share of its health, so CLLC's scaling changes nothing of it
+        // (Evade)
+        private const float FlashShare = 0.04f;
+        private const float FlashCooldown = 8f;
+        private const float FlashBehind = 8f;
+        private const float FlashMaxFromPlayer = 30f;
         // Its ward shows at most this often (seconds), and for a hit through its middle (a blast, Lightning Step, the
         // comet: nearer its axis than WardNear), this far from it toward whoever struck (meters)
         private const float WardEvery = 0.15f;
@@ -98,6 +111,10 @@ namespace NhxMagicWeapons.Bosses
         private float m_roleTimer;
         private float m_outOfReach;
         private float m_nextRush;
+        // A watcher's health as it last flashed or began to watch (a share; -1: not watching), and its next flash's
+        // earliest time (Evade)
+        private float m_flashFrom = -1f;
+        private float m_nextFlash;
         private float m_lastWard = -WardEvery;
         // Its answer to a clean staff's draw, on its way: when its rune strikes, and where (RPC_Punish, Arrive)
         private float m_answerAt;
@@ -106,6 +123,26 @@ namespace NhxMagicWeapons.Bosses
         // On its owner's game: when a living player was last known in its fight (Present; TwinsRules.CheckAbandoned).
         // Not yet: this game has only just begun to run it
         private float m_presentAt = -1f;
+
+        // Its timers go on where they were when another game takes it over (Claude's review, 2026-11-17, its #2, built at
+        // the user's word: "go ahead with #2"): a player whose game ran it dies and respawns far away, the other's game
+        // runs it from then, and until then its timers were on the first game only (Time.time, the attack items' own),
+        // so the second found every attack, rush and spell ready, and loosed them at once on the player left. They're
+        // kept in its ZDO too, in the network's time every game shares (Save, SetNextRush, TwinsPhase), and a game that
+        // begins to run it takes them up from there (Resume). Whether this game has, since it began to run it
+        private bool m_running;
+        // Until then it starts nothing (TwinsAI's attacks, TwinsPhase's spells): the AI and the phase may run before this
+        // in the frame this game takes it over, and would find everything ready
+        internal bool Running => m_running;
+        // When each attack item was last used, as last written to its ZDO (Save)
+        private readonly Dictionary<ItemDrop.ItemData, float> m_savedAttacks = new Dictionary<ItemDrop.ItemData, float>();
+        private static readonly int s_nextRushKey = "nhx_twin_next_rush".GetStableHashCode();
+        private static readonly Dictionary<string, int> s_attackKeys = new Dictionary<string, int>();
+
+        // The network's time, every game's alike (ticks): `seconds` from now, and how far a moment of it is from now
+        internal static long NetworkIn(float seconds) => (ZNet.instance ? ZNet.instance.GetTime().Ticks : 0L) + System.TimeSpan.FromSeconds(seconds).Ticks;
+
+        internal static float SecondsUntil(long at) => (float)System.TimeSpan.FromTicks(at - (ZNet.instance ? ZNet.instance.GetTime().Ticks : 0L)).TotalSeconds;
 
         // A living player is in its fight: their own game says so (PresentRpc, from TwinsDuel), or this one sees them
         internal void Present() => m_presentAt = Time.time;
@@ -258,7 +295,12 @@ namespace NhxMagicWeapons.Bosses
                 m_tauntHeld = 0f;
                 m_answerAt = 0f;
                 m_presentAt = -1f;
+                m_running = false;
                 return;
+            }
+            if (!m_running)
+            {
+                Resume();
             }
             if (m_answerAt > 0f && Time.time >= m_answerAt)
             {
@@ -273,9 +315,11 @@ namespace NhxMagicWeapons.Bosses
                 {
                     return;
                 }
+                Save();
                 TwinsAI.UpdateRole(this);
                 TwinsBond.Update(this);
                 Chase();
+                Evade();
             }
         }
 
@@ -306,9 +350,149 @@ namespace NhxMagicWeapons.Bosses
             if (m_outOfReach >= ChaseDelay && Time.time >= m_nextRush)
             {
                 m_outOfReach = 0f;
-                m_nextRush = Time.time + RushCooldown;
+                SetNextRush(RushCooldown);
                 TwinsLog.Event($"{TwinsLog.Name(this)} has been out of reach of {TwinsLog.Name(target)} for {ChaseDelay:0} s.");
                 Rush(target.transform.position, Element == Element.Storm ? StormChaseGap : ArriveGap, TwinsLog.Name(target));
+            }
+        }
+
+        // A watcher hurt by FlashShare of its health since its last flash flashes behind its twin (every RoleInterval)
+        private void Evade()
+        {
+            if (m_role != Role.Watcher || !(m_target is Player player) || player.IsDead())
+            {
+                m_flashFrom = -1f;
+                return;
+            }
+            float health = m_humanoid.GetHealthPercentage();
+            // Just begun to watch (or healed): counted from here
+            if (m_flashFrom < health)
+            {
+                m_flashFrom = health;
+            }
+            if (m_flashFrom - health < FlashShare || Time.time < m_nextFlash || m_humanoid.InAttack() || Answering
+                || (m_phase && m_phase.Busy(out _)))
+            {
+                return;
+            }
+            NearestLiving(transform.position, TwinsDuel.Other(Element), out CallerBoss twin);
+            if (!twin)
+            {
+                return;
+            }
+            // Beyond its twin on the line from the player (or from the player through itself, its twin at their feet)
+            Vector3 from = player.transform.position;
+            Vector3 away = twin.transform.position - from;
+            away.y = 0f;
+            if (away.sqrMagnitude < 1f)
+            {
+                away = transform.position - from;
+                away.y = 0f;
+            }
+            if (away.sqrMagnitude < 0.01f)
+            {
+                return;
+            }
+            Vector3 spot = from + away.normalized * Mathf.Min(away.magnitude + FlashBehind, FlashMaxFromPlayer);
+            TwinsLog.Event($"{TwinsLog.Name(this)} has lost {100f * (m_flashFrom - health):0.#}% of its health since it last flashed or began to watch: "
+                + $"it flashes behind the {TwinsLog.Name(twin)}.");
+            Rush(spot, 0f, "a spot behind its twin");
+            m_nextFlash = Time.time + FlashCooldown;
+            m_flashFrom = health;
+        }
+
+        // Its next chase can't come within `seconds`: here, and in its ZDO for a game that takes it over
+        private void SetNextRush(float seconds)
+        {
+            m_nextRush = Time.time + seconds;
+            m_nview.GetZDO().Set(s_nextRushKey, NetworkIn(seconds));
+        }
+
+        // Its ZDO key for when an attack item was last used
+        private static int AttackKey(ItemDrop.ItemData item)
+        {
+            string name = item.m_shared.m_name;
+            if (!s_attackKeys.TryGetValue(name, out int key))
+            {
+                key = ("nhx_twin_attack_" + name).GetStableHashCode();
+                s_attackKeys[name] = key;
+            }
+            return key;
+        }
+
+        // Its attacks (the items its AI picks them by: BossAttacks), with what their use is timed by
+        private IEnumerable<ItemDrop.ItemData> Attacks()
+        {
+            Inventory inventory = m_humanoid.GetInventory();
+            if (inventory == null)
+            {
+                yield break;
+            }
+            foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+            {
+                if (item != null && item.m_shared.m_aiAttackInterval > 0f)
+                {
+                    yield return item;
+                }
+            }
+        }
+
+        // On its owner's game, every RoleInterval: when its attacks were last used, those that were since it last looked,
+        // in its ZDO (the game times them by the item's m_lastAttackTime: BaseAI.CanUseAttack, MonsterAI)
+        private void Save()
+        {
+            ZDO zdo = m_nview.GetZDO();
+            foreach (ItemDrop.ItemData item in Attacks())
+            {
+                if (item.m_lastAttackTime <= 0f || (m_savedAttacks.TryGetValue(item, out float saved) && saved == item.m_lastAttackTime))
+                {
+                    continue;
+                }
+                m_savedAttacks[item] = item.m_lastAttackTime;
+                zdo.Set(AttackKey(item), NetworkIn(item.m_lastAttackTime - Time.time));
+            }
+        }
+
+        // As this game begins to run it (from its first moment, or taking it over): its timers from its ZDO, where the
+        // game that ran it before left them. Its attacks' wait until its items are there (Humanoid.Start)
+        private void Resume()
+        {
+            int items = 0;
+            List<string> resumed = new List<string>();
+            ZDO zdo = m_nview.GetZDO();
+            foreach (ItemDrop.ItemData item in Attacks())
+            {
+                items++;
+                long at = zdo.GetLong(AttackKey(item));
+                if (at != 0L)
+                {
+                    item.m_lastAttackTime = Time.time + SecondsUntil(at);
+                    m_savedAttacks[item] = item.m_lastAttackTime;
+                    float wait = item.m_shared.m_aiAttackInterval - (Time.time - item.m_lastAttackTime);
+                    resumed.Add($"{item.m_shared.m_name.Replace("NhxStormcaller", "").Replace("NhxFirecaller", "").ToLowerInvariant()} "
+                        + (wait > 0f ? $"in {wait:0.#} s" : "ready"));
+                }
+            }
+            if (items == 0)
+            {
+                return;
+            }
+            m_running = true;
+            long rush = zdo.GetLong(s_nextRushKey);
+            if (rush != 0L)
+            {
+                m_nextRush = Time.time + SecondsUntil(rush);
+                float wait = m_nextRush - Time.time;
+                resumed.Add("rush " + (wait > 0f ? $"in {wait:0.#} s" : "ready"));
+            }
+            string spells = m_phase ? m_phase.Resume() : null;
+            if (spells != null)
+            {
+                resumed.Add(spells);
+            }
+            if (resumed.Count > 0)
+            {
+                TwinsLog.Event($"{TwinsLog.Name(this)} is run by this game now: its timers go on where they were ({string.Join(", ", resumed)}).");
             }
         }
 
@@ -364,7 +548,7 @@ namespace NhxMagicWeapons.Bosses
                 TwinsVoices.Impatient(this, player);
                 TwinsDuel.Smite(Element, player, m_humanoid, TwinsDuel.SwapDamage, TwinsDuel.SmiteRadius);
                 Rush(player.transform.position, ArriveGap, TwinsLog.Name(player));
-                m_nextRush = Time.time + RushCooldown;
+                SetNextRush(RushCooldown);
                 return;
             }
             Vector3 point = LightningStrike.Ground(player.transform.position);
@@ -372,8 +556,7 @@ namespace NhxMagicWeapons.Bosses
             ElementRune rune = prefab ? ElementRune.Create(prefab, point, TwinsDuel.AnswerDelay, TwinsDuel.AnswerRadius) : null;
             if (rune)
             {
-                rune.m_caster = m_humanoid;
-                rune.m_hit = TwinsDuel.AnswerHit(Element, m_humanoid);
+                rune.SetHit(m_humanoid, TwinsDuel.AnswerHit(Element, m_humanoid));
             }
             m_answerAt = Time.time + TwinsDuel.AnswerDelay;
             m_answerPoint = point;
@@ -391,7 +574,7 @@ namespace NhxMagicWeapons.Bosses
                 return;
             }
             Rush(m_answerPoint, AnswerGap, "its rune");
-            m_nextRush = Time.time + RushCooldown;
+            SetNextRush(RushCooldown);
         }
 
         // It lands this far short of its rune's middle (meters): on the rune, not on a player who stayed there

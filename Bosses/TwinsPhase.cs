@@ -83,6 +83,8 @@ namespace NhxMagicWeapons.Bosses
         private const float CometPast = 5f;
         private const float CometWidth = 2f;
         private const float CometDamage = 150f;
+        // Its way, sent to every game to judge its own player (Burn)
+        private const string CometRpc = "NhxTwinsComet";
         private const float CometPush = 30f;
         private const float TrailTime = 5f;
         private const float TrailWidth = 1.5f;
@@ -107,6 +109,10 @@ namespace NhxMagicWeapons.Bosses
 
         private static readonly int s_enragedKey = "nhx_twin_enraged".GetStableHashCode();
         private static readonly int s_enragedAtKey = "nhx_twin_enraged_at".GetStableHashCode();
+        // Its next spell's time and its last comet's, in the network's time, for a game that takes it over (Resume;
+        // CallerBoss: its timers go on where they were)
+        private static readonly int s_nextSpellKey = "nhx_twin_next_spell".GetStableHashCode();
+        private static readonly int s_lastCometKey = "nhx_twin_last_comet".GetStableHashCode();
         private static readonly Dictionary<Character, TwinsPhase> s_phases = new Dictionary<Character, TwinsPhase>();
         private static readonly List<Player> s_partners = new List<Player>();
 
@@ -189,6 +195,10 @@ namespace NhxMagicWeapons.Bosses
             m_nview = GetComponent<ZNetView>();
             m_humanoid = GetComponent<Humanoid>();
             m_animation = GetComponent<ZSyncAnimation>();
+            if (m_nview)
+            {
+                m_nview.Register<Vector3, Vector3>(CometRpc, (sender, from, to) => Burn(from, to));
+            }
             if (m_humanoid)
             {
                 s_phases[m_humanoid] = this;
@@ -232,6 +242,11 @@ namespace NhxMagicWeapons.Bosses
                 m_windup = -1f;
                 m_coming = false;
                 m_armsUp = false;
+                return;
+            }
+            // Not before this game has taken up its timers (CallerBoss.Resume)
+            if (!m_boss.Running)
+            {
                 return;
             }
             if (!enraged)
@@ -380,6 +395,39 @@ namespace NhxMagicWeapons.Bosses
             }
         }
 
+        // Its next spell no sooner than `seconds` from now: here, and in its ZDO for a game that takes it over
+        private void SetNextSpell(float seconds)
+        {
+            m_nextSpell = Time.time + seconds;
+            m_nview.GetZDO().Set(s_nextSpellKey, CallerBoss.NetworkIn(seconds));
+        }
+
+        // As a game begins to run it (CallerBoss.Resume): its spells' times from its ZDO, where the game that ran it
+        // before left them. What it took up, for the log, or null
+        internal string Resume()
+        {
+            if (!m_nview || !m_nview.IsValid())
+            {
+                return null;
+            }
+            ZDO zdo = m_nview.GetZDO();
+            List<string> resumed = new List<string>();
+            long next = zdo.GetLong(s_nextSpellKey);
+            if (next != 0L)
+            {
+                m_nextSpell = Time.time + CallerBoss.SecondsUntil(next);
+                float wait = m_nextSpell - Time.time;
+                resumed.Add((m_boss && m_boss.Element == Element.Storm ? "storm " : "phase spell ") + (wait > 0f ? $"in {wait:0.#} s" : "ready"));
+            }
+            long comet = zdo.GetLong(s_lastCometKey);
+            if (comet != 0L)
+            {
+                m_lastComet = Time.time + CallerBoss.SecondsUntil(comet);
+                resumed.Add($"last comet {Time.time - m_lastComet:0.#} s ago");
+            }
+            return resumed.Count > 0 ? string.Join(", ", resumed) : null;
+        }
+
         // Its twin fell (TwinsBond.Fell, on its owner's game): alone, its second phase comes now, whatever its health,
         // with its transition and its line, as at half its health
         internal void TwinFell()
@@ -402,7 +450,7 @@ namespace NhxMagicWeapons.Bosses
             m_raised = false;
             TwinsVoices.Say(m_boss.Element == Element.Storm ? TwinsVoices.BlueP2 : TwinsVoices.RedP2, transform.position,
                 $"the {TwinsLog.Name(m_boss)} enters its second phase{(raised ? ", raised" : "")}", raised);
-            m_nextSpell = Time.time + TransitionTime + FirstAfter;
+            SetNextSpell(TransitionTime + FirstAfter);
             m_coming = true;
             m_armsUp = false;
         }
@@ -419,7 +467,7 @@ namespace NhxMagicWeapons.Bosses
                 m_nextSpell = Time.time + RetryAfter;
                 return;
             }
-            m_nextSpell = Time.time + StormInterval;
+            SetNextSpell(StormInterval);
             TwinsLog.Event($"Stormcaller calls its storm over {TwinsLog.Name(other)}.");
             TwinsStorm.Create(m_humanoid, other);
         }
@@ -454,6 +502,7 @@ namespace NhxMagicWeapons.Bosses
                 return;
             }
             m_lastComet = Time.time;
+            m_nview.GetZDO().Set(s_lastCometKey, CallerBoss.NetworkIn(0f));
             m_aim = LightningStrike.Ground(other.transform.position);
             m_windup = CometWindup;
             m_flameTimer = 0f;
@@ -499,40 +548,48 @@ namespace NhxMagicWeapons.Bosses
             }
             StaffEffects.Create(CometDash.s_leaveEffects, from, Quaternion.LookRotation(dir));
             m_flare = 1f;
-            Burn(from, to, dir);
+            // Each game judges whether its own player was on the way (Burn)
+            m_nview.InvokeRPC(ZNetView.Everybody, CometRpc, from, to);
         }
 
-        // The players on the way take the comet's hit
-        private void Burn(Vector3 from, Vector3 to, Vector3 dir)
+        // On every game, as the comet goes from `from` to `to` (CometRpc): this game's player takes its hit if they're on
+        // the way. Each game judges its own (Claude's review, 2026-11-17, its #1, as ElementRune's strikes): the game that
+        // runs the twin judged every player where it saw them, 0.2 s or more behind where they were. A roll through it
+        // still dodges it, as the game judges it, on the player's own game (Character.RPC_Damage)
+        private void Burn(Vector3 from, Vector3 to)
         {
+            Player player = Player.m_localPlayer;
+            // Those in its fight: who watches from outside the ring isn't touched (TwinsRing)
+            if (!player || player.IsDead() || !m_humanoid || !TwinsRing.Inside(m_boss, player.transform.position))
+            {
+                return;
+            }
             Vector3 path = to - from;
             float length = path.magnitude;
-            Vector3 along = length > 0.01f ? path / length : dir;
-            foreach (Player player in Player.GetAllPlayers())
+            Vector3 along = length > 0.01f ? path / length : transform.forward;
+            Vector3 center = player.GetCenterPoint();
+            float t = Mathf.Clamp(Vector3.Dot(center - from, along), 0f, length);
+            float off = Vector3.Distance(from + along * t, center);
+            if (off > CometWidth)
             {
-                // Those in its fight: who watches from outside the ring isn't touched (TwinsRing)
-                if (!player || player.IsDead() || !TwinsRing.Inside(m_boss, player.transform.position))
+                if (off <= CometWidth + 1.5f)
                 {
-                    continue;
+                    TwinsLog.Event($"{TwinsLog.Name(player)} is clear of the {TwinsLog.Name(m_boss)}'s comet by {off - CometWidth:0.0} m.");
                 }
-                Vector3 center = player.GetCenterPoint();
-                float t = Mathf.Clamp(Vector3.Dot(center - from, along), 0f, length);
-                if ((from + along * t - center).sqrMagnitude > CometWidth * CometWidth)
-                {
-                    continue;
-                }
-                HitData hit = new HitData();
-                hit.m_damage.m_fire = CometDamage;
-                hit.m_point = center;
-                hit.m_dir = along;
-                hit.m_pushForce = CometPush;
-                hit.m_blockable = false;
-                hit.m_dodgeable = true;
-                hit.m_staggerMultiplier = 0f;
-                hit.m_hitType = HitData.HitType.EnemyHit;
-                hit.SetAttacker(m_humanoid);
-                player.Damage(hit);
+                return;
             }
+            TwinsLog.Event($"{TwinsLog.Name(player)} is on the {TwinsLog.Name(m_boss)}'s comet's way, {CometWidth - off:0.0} m inside its edge{(player.IsDodgeInvincible() ? ", rolling" : "")}.");
+            HitData hit = new HitData();
+            hit.m_damage.m_fire = CometDamage;
+            hit.m_point = center;
+            hit.m_dir = along;
+            hit.m_pushForce = CometPush;
+            hit.m_blockable = false;
+            hit.m_dodgeable = true;
+            hit.m_staggerMultiplier = 0f;
+            hit.m_hitType = HitData.HitType.EnemyHit;
+            hit.SetAttacker(m_humanoid);
+            player.Damage(hit);
         }
 
         // Whom its phase's spell goes to: watching, its one player; hunting, its twin's quarry if that isn't its own, or
