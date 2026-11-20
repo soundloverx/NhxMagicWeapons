@@ -67,6 +67,9 @@ namespace NhxMagicWeapons.Bosses
         internal const float AnswerRadius = 2.5f;
         // Each stack slows eitr's (Static) or stamina's (Scorch) return by this much
         private const float RegenCut = 0.2f;
+        // And from its first stack, while its staff is in hand, hastens the other's (Static stamina's, Scorch eitr's) by
+        // this much, flat: a hold of 25 s costs about 10 s of regen, which the next staff's 20 s of this pays back
+        private const float RegenBoost = 0.5f;
         // The smites: the swap's and the full charge's, moderate (150 is 56 after 100 armor), the full charge's half again
         // as much each time it comes again without a swap (150, 225, 338...: one each StackInterval now, from the fifth
         // stack), before what SmiteWeakness adds; on the ground, this wide (their look only: they hit the one player)
@@ -124,8 +127,8 @@ namespace NhxMagicWeapons.Bosses
 
         internal static void Add()
         {
-            ElementCharge.Add(ElementCharge.StaticName, "$se_nhx_static", "$se_nhx_static_tooltip", HitData.DamageType.Lightning, Storms.Icon, MaxStacks, RegenCut);
-            ElementCharge.Add(ElementCharge.ScorchName, "$se_nhx_scorch", "$se_nhx_scorch_tooltip", HitData.DamageType.Fire, Wrath.Icon, MaxStacks, RegenCut);
+            ElementCharge.Add(ElementCharge.StaticName, "$se_nhx_static", "$se_nhx_static_tooltip", HitData.DamageType.Lightning, Storms.Icon, MaxStacks, RegenCut, RegenBoost);
+            ElementCharge.Add(ElementCharge.ScorchName, "$se_nhx_scorch", "$se_nhx_scorch_tooltip", HitData.DamageType.Fire, Wrath.Icon, MaxStacks, RegenCut, RegenBoost);
             // With the twins' hearts' icons (their drops: TwinsItems), so they don't look like the charges beside them
             SmiteWeakness.Add(SmiteWeakness.StormName, "$se_nhx_stormstruck", "$se_nhx_stormstruck_tooltip", HitData.DamageType.Lightning, IconOf(TwinsItems.Stormheart, Storms.Icon));
             SmiteWeakness.Add(SmiteWeakness.FireName, "$se_nhx_flamestruck", "$se_nhx_flamestruck_tooltip", HitData.DamageType.Fire, IconOf(TwinsItems.SurtrsTear, Wrath.Icon));
@@ -544,7 +547,8 @@ namespace NhxMagicWeapons.Bosses
                 }
                 bool drawn = element == s_drawn;
                 string effect = !regen ? ""
-                    : drawn ? $" ({(element == Element.Storm ? "eitr" : "stamina")} regen x{Mathf.Max(0f, 1f - RegenCut * Mathf.FloorToInt(charge)):0.00})"
+                    : drawn ? $" ({(element == Element.Storm ? "eitr" : "stamina")} regen x{Mathf.Max(0f, 1f - RegenCut * Mathf.FloorToInt(charge)):0.00}, "
+                        + $"{(element == Element.Storm ? "stamina" : "eitr")} regen x{(charge >= 1f ? 1f + RegenBoost : 1f):0.00})"
                     : " (no effect)";
                 parts.Add($"{ChargeName(element)} {charge:0.0} {(drawn ? "in hand" : $"draining, clean in {(s_drain[e] > 0f ? charge / s_drain[e] : 0f):0} s")}{effect}");
             }

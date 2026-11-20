@@ -66,8 +66,13 @@ namespace NhxMagicWeapons.Bosses
         // The Stormcaller's bolt from its hands (BossBolt), a hunter's (it brings the Stormcaller in after a player): within
         // 20 m, every 5 s at most, on the held flamethrower animation (both hands out): 5 puffs of charge (1 s), then the
         // bolt, reaching 30 m from its hands, for 120 lightning, half the usual stagger (lightning staggers: a full 120 would
-        // nearly always), chaining as the staff at level 10 (half the time, up to 5 jumps), looking like the staff's at 15
+        // nearly always), chaining as the staff at level 10 (half the time, up to 5 jumps), looking like the staff's at 15.
+        // It walks on as it charges (the user, 2026-11-20: "I would have the Stormcaller move while charging his hunter
+        // lightning too", as the hunters close in: TwinsAI.Close), at BoltMove of its speed (3 m/s running: a jogging player
+        // gains on it a little), turning freely: where the bolt goes was set as the charge began (BossBolt)
         private const float BoltRange = 20f;
+        private const float BoltMove = 0.6f;
+        private const float BoltTurn = 1f;
         private const float BoltInterval = 5f;
         private const int BoltCharge = 5;
         private const float BoltReach = 30f;
@@ -190,8 +195,8 @@ namespace NhxMagicWeapons.Bosses
             Attack attack = Wrath.HeldAttack(heldAttack, castPrefab, 0f, PuffInterval, 1f, 0f);
             attack.m_projectileBursts = BoltCharge + 1;
             attack.m_perBurstResourceUsage = false;
-            attack.m_speedFactor = 0f;
-            attack.m_speedFactorRotation = FlamesTurn;
+            attack.m_speedFactor = BoltMove;
+            attack.m_speedFactorRotation = BoltTurn;
             Quiet(attack);
             attack.m_staggerMultiplier = BoltStagger;
             return AddItem(BoltName, attack, new HitData.DamageTypes { m_lightning = BoltLightning }, BoltRange, BoltInterval);

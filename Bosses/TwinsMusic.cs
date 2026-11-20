@@ -25,6 +25,10 @@ namespace NhxMagicWeapons.Bosses
         // Its volume (the game's music is about 1), and how long it takes to come in
         private const float Volume = 1f;
         private const float FadeIn = 3f;
+        // Where each time round after the first starts, and where it leaves for there (seconds into the track; LoopFrom 0:
+        // from its top, as the game loops it; LoopAt 0: at its end). See LoopBack
+        private const float LoopFrom = 43.31f;
+        private const float LoopAt = 0f;
 
         private static string s_fallbackEvent;
 
@@ -144,6 +148,72 @@ namespace NhxMagicWeapons.Bosses
                     s_turnedOn = false;
                     Settings.ContinousMusic = false;
                 }
+            }
+        }
+
+        // Each time round after the first, the fight's music starts at LoopFrom, not at its top (the user, 2026-11-20: "can
+        // we make the song start from a different timestamp when looping and only start from the beginning when the fight
+        // starts?"). The game plays it on a looping source, which would go back to its top by itself; so, after each music
+        // update, as it comes within a frame or so of LoopAt (or its end), it's sent back: to just before LoopFrom by what
+        // it had still to play, so that LoopFrom comes in exactly when LoopAt would have, keeping the beat. Missed (a long
+        // frame), from wherever it got to: past LoopAt by a little, or round past its top. The game starts it at its top
+        // each time it starts it (the fight's start; again after dying and coming back, as before), and that one isn't
+        // touched
+        [HarmonyPatch(typeof(MusicMan), "UpdateMusic")]
+        private static class LoopBack
+        {
+            // How far ahead of the next update it goes back (of this update's time: the next may be a little longer)
+            private const float Lead = 1.5f;
+
+            // Where the track was at the last update (samples; -1: not ours playing), to catch it come round to its top
+            private static int s_last = -1;
+
+            private static void Postfix(MusicMan __instance, float dt)
+            {
+                AudioSource source = __instance.m_musicSource;
+                MusicMan.NamedMusic current = __instance.m_currentMusic;
+                if (LoopFrom <= 0f || current == null || current.m_name != MusicName || __instance.m_queuedMusic != null
+                    || __instance.m_stopMusic || !source || !source.isPlaying || !source.clip)
+                {
+                    s_last = -1;
+                    return;
+                }
+                AudioClip clip = source.clip;
+                int rate = clip.frequency;
+                int end = LoopAt > 0f ? Mathf.Min(clip.samples, Mathf.RoundToInt(LoopAt * rate)) : clip.samples;
+                int from = Mathf.RoundToInt(LoopFrom * rate);
+                if (from >= end)
+                {
+                    return;
+                }
+                int at = source.timeSamples;
+                int lead = Mathf.CeilToInt(dt * Lead * rate);
+                // Half a second: off by more, it starts at LoopFrom itself (e.g. the game's own test jump to 4 s before
+                // the end, "test" in the console, then shift+N)
+                int near = rate / 2;
+                int to = -1;
+                if (at + lead >= end)
+                {
+                    int off = at - end;
+                    to = off > -lead - near && off < near ? Mathf.Max(0, from + off) : from;
+                }
+                else if (end == clip.samples && s_last >= 0 && at < s_last && s_last + 2 * lead >= end)
+                {
+                    to = from + (at < near ? at : 0);
+                }
+                if (to < 0)
+                {
+                    s_last = at;
+                    return;
+                }
+                source.timeSamples = to;
+                s_last = to;
+                Plugin.Log.LogInfo($"The twins' music goes round again from {Clock(LoopFrom)} (it was at {Clock((float)at / rate)}).");
+            }
+
+            private static string Clock(float seconds)
+            {
+                return $"{(int)(seconds / 60f)}:{seconds % 60f:00.00}";
             }
         }
 

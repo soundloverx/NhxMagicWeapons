@@ -18,16 +18,23 @@ namespace NhxMagicWeapons.Bosses
     //   can hurt it (a staff cannot hurt its own caller: TwinsRules); with no such player, of who drew its own, or the
     //   nearest. The fight's redesign, agreed with the user 2026-11-15: alone with one player, the only staff that hurts
     //   the survivor is the fallen twin's, so by the rules above it would have stood and watched to the end
-    // Its AI goes after that target (UpdateTarget); the attacks, moves and the rest are the game's
+    // Its AI goes after that target (UpdateTarget); the attacks, moves and the rest are the game's, but a hunter closes in
+    // on its quarry, where the game's AI would stop as soon as its attack in hand reaches them (Close)
     internal static class TwinsAI
     {
         // A watcher's spell waits this many times its interval
         private const float WatcherSlowdown = 1.5f;
+        // How close a hunter comes to its quarry (meters, middle to middle): at arm's length, well within its pulse
+        // (TwinsPulse)
+        private const float CloseGap = 3f;
 
         private static readonly List<Player> s_fighters = new List<Player>();
         // BaseAI.SetAlerted is protected (virtual: MonsterAI's own runs): called through a delegate, not directly
         private static readonly System.Action<BaseAI, bool> s_setAlerted =
             AccessTools.MethodDelegate<System.Action<BaseAI, bool>>(AccessTools.Method(typeof(BaseAI), "SetAlerted"));
+        // BaseAI.MoveTo (protected): the same way
+        private static readonly System.Func<BaseAI, float, Vector3, float, bool, bool> s_moveTo =
+            AccessTools.MethodDelegate<System.Func<BaseAI, float, Vector3, float, bool, bool>>(AccessTools.Method(typeof(BaseAI), "MoveTo"));
 
         internal static void UpdateRole(CallerBoss boss)
         {
@@ -304,8 +311,36 @@ namespace NhxMagicWeapons.Bosses
             }
         }
 
+        // A hunter closes in on its quarry (the user, 2026-11-20, with the twins' pulse, TwinsPulse: "The bosses would hunt
+        // the players like football players chase the ball: to kick it a bit"; asked how far, "Both close in"): the
+        // game's AI stops where its attack in hand reaches its target (MonsterAI.UpdateAI: the Stormcaller's bolt 20 m,
+        // its call 35, the Firecaller's flames 9), so a twin was never close enough to kick. Now, after the AI has done
+        // its part (aimed and attacked), a hunter walks on at its quarry, to CloseGap from them. Not in an attack that
+        // holds it where it stands (the Firecaller's flames: its speed in it is none; the Stormcaller's bolt moves it,
+        // BossAttacks), nor while it stands for its second phase or its comet (Hold), nor in the moment before a left
+        // fight's twin goes. Watchers keep back and judges stand, as before
+        [HarmonyPatch(typeof(MonsterAI), nameof(MonsterAI.UpdateAI))]
+        private static class Close
+        {
+            private static void Postfix(MonsterAI __instance, float dt, bool __result)
+            {
+                if (!__result || !CallerBoss.ByAI.TryGetValue(__instance, out CallerBoss boss) || !boss || boss.m_abandoned
+                    || boss.m_role != CallerBoss.Role.Hunter || !(boss.m_target is Player quarry) || quarry.IsDead())
+                {
+                    return;
+                }
+                Humanoid humanoid = boss.m_humanoid;
+                if (!humanoid || humanoid.IsDead() || (boss.m_phase && boss.m_phase.Busy(out _))
+                    || (humanoid.InAttack() && humanoid.GetAttackSpeedFactorMovement() <= 0f))
+                {
+                    return;
+                }
+                s_moveTo?.Invoke(__instance, dt, quarry.transform.position, CloseGap, true);
+            }
+        }
+
         // A twin with nothing to cast stands and watches its player, rather than wandering about (alerted, the game's
-        // idle wandering is a run): Watching
+        // idle wandering is a run): Watching. A hunter only stands until Close moves it on
         [HarmonyPatch(typeof(BaseAI), "IdleMovement")]
         private static class Idle
         {

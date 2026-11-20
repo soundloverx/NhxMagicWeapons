@@ -32,14 +32,16 @@ namespace NhxMagicWeapons.Bosses
         // Each twin's health: 5000 at first, then half again (the user, 2026-11-15, after a full fight alone: "Next I want to
         // increase their health by 50%"). The game multiplies what they take by its divisor for the players near (CLLC's
         // health per player on the server)
-        private const float Health = 7500f;
+        private const float Health = 6000f;
         // Their two gaits: a monster's AI moves at m_speed and m_runSpeed, and their legs, twice as long, cover twice the
         // ground for each step (CallerBoss gives the animations half the speed). Walking as the player walks (1.6 m/s,
         // 3.2 for them); running at first as the player jogs (4 m/s, 8 for them), which outran the players (the user: "You
-        // were right, they are faster than the players"), so now 5 m/s: faster than a player's jog (4), slower than their
-        // sprint (7); the animation goes halfway between walking and jogging
+        // were right, they are faster than the players"), so then 5 m/s: faster than a player's jog (4), slower than their
+        // sprint (7); the animation goes halfway between walking and jogging. Then 4.5 (2026-11-20), once hunters closed in
+        // to pulse (TwinsPulse): at 5 a hunter was back within its pulse 2 s after pushing out a jogging player, so jogging
+        // never helped; at 4.5 it takes about 4 s, and it still catches them. The user: "yes, make it 4.5"
         private const float WalkSpeed = 1.6f * Size;
-        private const float RunSpeed = 5f;
+        private const float RunSpeed = 4.5f;
         // How far they notice players (meters): seen within their view's angle, or heard
         private const float ViewRange = 40f;
         private const float HearRange = 30f;
@@ -69,6 +71,7 @@ namespace NhxMagicWeapons.Bosses
             TwinsMusic.Prepare();
             BossAttacks.AddRunes();
             TwinsStorm.AddPrefabs();
+            TwinsPulse.AddPrefabs();
             AddBoss(StormName, "$enemy_nhx_stormcaller", body, Armor.StormcallerArmor.StormPieces, Element.Storm, BossAttacks.AddStormCall(), BossAttacks.AddStormBolt());
             AddBoss(FireName, "$enemy_nhx_firecaller", body, Armor.StormcallerArmor.FirePieces, Element.Fire, BossAttacks.AddFireFlames(), BossAttacks.AddFireSigil());
         }
@@ -237,6 +240,7 @@ namespace NhxMagicWeapons.Bosses
 
             boss.AddComponent<CallerBoss>().m_element = (int)element;
             boss.AddComponent<TwinsPhase>();
+            boss.AddComponent<TwinsPulse>();
             PrefabManager.Instance.AddPrefab(boss);
         }
 

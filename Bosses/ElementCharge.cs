@@ -23,7 +23,13 @@ namespace NhxMagicWeapons.Bosses
     // SEMan): in hand, its stacks on its icon; draining, the seconds until it's gone (with an "s": the game's own timers
     // show bare seconds, which would read as stacks). It's there for as long as there's any charge, so its icon says the
     // staff isn't clean, and drawing it would be answered at once. Every game sees the drawn staff's charge on the
-    // player (ChargeLook, from their ZDO). No time limit of its own: it goes when TwinsDuel says, or with the fight
+    // player (ChargeLook, from their ZDO). No time limit of its own: it goes when TwinsDuel says, or with the fight.
+    // From its first stack, while its staff is in hand, it also hastens the other's regen by m_regenBoost, flat whatever
+    // its stacks: Static stamina's, Scorch eitr's, so a staff's turn pays back what the other's took. The user
+    // (2026-11-20), after running out of stamina with the Firecaller on them: "boost stamina regen once I have one Storm
+    // staff debuff and boost eitr regen once I have one Muspelheim staff debuff [...] the regen boosts would have no
+    // effect if I am holding the opposite staff"; then "the boost must be flat, not increasing with the stacks". Draining,
+    // it does nothing either way
     internal class ElementCharge : StatusEffect
     {
         internal const string StaticName = "SE_NhxStatic";
@@ -32,6 +38,7 @@ namespace NhxMagicWeapons.Bosses
         public HitData.DamageType m_element = HitData.DamageType.Lightning;
         public int m_maxStacks = 5;
         public float m_regenCut = 0.2f;
+        public float m_regenBoost = 0.5f;
 
         private int m_stacks;
         // The other staff drawn: draining, building nothing and slowing nothing, gone in m_cleanIn seconds
@@ -39,7 +46,7 @@ namespace NhxMagicWeapons.Bosses
         private float m_cleanIn;
 
         // Registered with Jotunn, so its hash finds it (SEMan.AddStatusEffect looks it up in ObjectDB)
-        internal static StatusEffect Add(string name, string key, string tooltip, HitData.DamageType element, Sprite icon, int maxStacks, float regenCut)
+        internal static StatusEffect Add(string name, string key, string tooltip, HitData.DamageType element, Sprite icon, int maxStacks, float regenCut, float regenBoost)
         {
             ElementCharge charge = ScriptableObject.CreateInstance<ElementCharge>();
             charge.name = name;
@@ -50,6 +57,7 @@ namespace NhxMagicWeapons.Bosses
             charge.m_element = element;
             charge.m_maxStacks = maxStacks;
             charge.m_regenCut = regenCut;
+            charge.m_regenBoost = regenBoost;
             ItemManager.Instance.AddStatusEffect(new CustomStatusEffect(charge, false));
             return charge;
         }
@@ -77,22 +85,18 @@ namespace NhxMagicWeapons.Bosses
             m_cleanIn = cleanIn;
         }
 
+        // Its own resource's regen: slowed a step a stack. The other's: hastened, flat, from its first stack
         private float Left => m_draining ? 1f : Mathf.Max(0f, 1f - m_regenCut * m_stacks);
+        private float Boost => m_draining || m_stacks < 1 ? 1f : 1f + m_regenBoost;
 
         public override void ModifyEitrRegen(ref float eitrRegen)
         {
-            if (m_element == HitData.DamageType.Lightning)
-            {
-                eitrRegen *= Left;
-            }
+            eitrRegen *= m_element == HitData.DamageType.Lightning ? Left : Boost;
         }
 
         public override void ModifyStaminaRegen(ref float staminaRegen)
         {
-            if (m_element == HitData.DamageType.Fire)
-            {
-                staminaRegen *= Left;
-            }
+            staminaRegen *= m_element == HitData.DamageType.Fire ? Left : Boost;
         }
 
         public override string GetIconText()

@@ -60,8 +60,9 @@ namespace NhxMagicWeapons.Bosses
         internal const float PushRadius = 6f;
         private const float PushNear = 5f;
         private const float PushFar = 2f;
-        private const float PushSpeed = 20f;
-        private const float PushWane = 100f;
+        // (the pulse's kick too: TwinsPulse)
+        internal const float PushSpeed = 20f;
+        internal const float PushWane = 100f;
         // The Firecaller's wings open this far (0 to 1) as it comes, the rest of the way at once as it has come
         private const float WingsWhileComing = 0.6f;
         // The Stormcaller's shake as it has come (meters around, strength; Muspelheim's blast shakes for the Firecaller)
@@ -158,6 +159,10 @@ namespace NhxMagicWeapons.Bosses
                 return Mathf.Clamp01(since / TransitionTime);
             }
         }
+
+        // How much bigger it is than it was before its phase (eased in and out as it comes): its size (Grow), its pulse's
+        // (TwinsPulse)
+        internal float Grown => 1f + Growth * Mathf.SmoothStep(0f, 1f, Progress);
 
         // How far a twin's second phase has come, 0 for anyone else (its shards: Armor\ArmorLegendFx)
         internal static float ProgressOf(Character character)
@@ -281,7 +286,7 @@ namespace NhxMagicWeapons.Bosses
         // On every game: its size, from how far its phase has come (eased in and out), set only as it changes
         private void Grow()
         {
-            Vector3 size = m_size * (1f + Growth * Mathf.SmoothStep(0f, 1f, Progress));
+            Vector3 size = m_size * Grown;
             if ((transform.localScale - size).sqrMagnitude > 1e-8f)
             {
                 transform.localScale = size;
@@ -723,8 +728,9 @@ namespace NhxMagicWeapons.Bosses
             return TwinsRing.Inside(storm, player.transform.position);
         }
 
-        // `share` of the player's health as the element, lessened by their resistance to it; no stagger, no push
-        private static void Hurt(Player player, Element element, float share)
+        // `share` of the player's health as the element, lessened by their resistance to it; no stagger, no push (the
+        // pulse's too: TwinsPulse)
+        internal static void Hurt(Player player, Element element, float share)
         {
             HitData hit = new HitData();
             float damage = player.GetMaxHealth() * share;

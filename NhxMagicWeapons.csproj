@@ -150,6 +150,8 @@
     <Compile Include="Bosses\TwinsJudgment.cs" />
     <Compile Include="Bosses\TwinsMusic.cs" />
     <Compile Include="Bosses\TwinsPhase.cs" />
+    <Compile Include="Bosses\TwinsPulse.cs" />
+    <Compile Include="Bosses\TwinsBurnLook.cs" />
     <Compile Include="Bosses\RingLook.cs" />
     <Compile Include="Bosses\TwinsRing.cs" />
     <Compile Include="Bosses\TwinsRules.cs" />

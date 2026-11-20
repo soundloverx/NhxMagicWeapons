@@ -26,6 +26,8 @@ namespace NhxMagicWeapons.Bosses
     // its delay after it appeared there, and hits that game's player if they're within it then and not rolling (HitLocal),
     // with the hit the creating game wrote in its ZDO (SetHit): the warning they saw is the one they get, and where they
     // stand is where they are. Nothing but players is hit any more (the arena's creatures are held: TwinsStasis)
+    // A twin's pulse (TwinsPulse) is one too: it follows its twin on every game (Follow), its disc dropped onto the ground
+    // again as it goes, and as it strikes, its kick is judged in place of a hit (m_kick)
     internal class ElementRune : MonoBehaviour
     {
         public bool m_fire;
@@ -34,6 +36,10 @@ namespace NhxMagicWeapons.Bosses
         // The storm's strike from the sky (networked, created by the owner)
         public GameObject m_strike;
         public int m_strikeLevel = 20;
+        // How hard the fire's blast shakes the camera
+        public float m_blastShake = 1f;
+        // A twin's pulse: as it strikes, TwinsPulse.Kick for this game's player, not a hit
+        public bool m_kick;
 
         // On the creating game, right after creating it
         internal Character m_caster;
@@ -43,8 +49,12 @@ namespace NhxMagicWeapons.Bosses
         private static readonly int s_radiusKey = "nhx_rune_radius".GetStableHashCode();
         // Its hit, as RPC_Damage sends one (HitData.Serialize), for every game to deal to its own player
         private static readonly int s_hitKey = "nhx_rune_hit".GetStableHashCode();
+        // The character it follows (a twin's pulse), for every game to find
+        private static readonly KeyValuePair<int, int> s_followKey = ZDO.GetHashZDOID("nhx_rune_follow");
         // A player this much past its edge as it strikes is a near miss, for the log (meters)
         private const float NearMiss = 1.5f;
+        // Following, its disc is dropped onto the ground again this often (seconds)
+        private const float DropEvery = 0.1f;
 
         // The disc it's drawn on, as the sigil's: rings of vertices dropped onto the ground (within GroundReach up or down
         // of its middle) and lifted a little: 15 cm (6 at first, as the sigil's; the user, 2026-11-15: "The runes on the
@@ -79,6 +89,7 @@ namespace NhxMagicWeapons.Bosses
         private ZNetView m_nview;
         private MeshRenderer[] m_renderers;
         private Vector2[] m_flat;
+        private Vector3[] m_vertices;
         private Vector2[] m_uvs;
         private Mesh[] m_layerMeshes;
         private float[] m_turns;
@@ -88,6 +99,9 @@ namespace NhxMagicWeapons.Bosses
         private float m_phase;
         private bool m_struck;
         private bool m_started;
+        // Whom it follows (Follow), and when its disc is next dropped onto the ground
+        private Character m_followed;
+        private float m_dropTimer;
 
         // On the creating game: a rune of `prefab`'s kind at `point`, striking after `delay`, `radius` around
         internal static ElementRune Create(GameObject prefab, Vector3 point, float delay, float radius)
@@ -120,6 +134,16 @@ namespace NhxMagicWeapons.Bosses
             m_nview.GetZDO().Set(s_hitKey, package.GetArray());
         }
 
+        // On the creating game, right after Create: it follows `character` on every game (a twin's pulse: TwinsPulse)
+        internal void Follow(Character character)
+        {
+            m_followed = character;
+            if (character && m_nview && m_nview.IsValid())
+            {
+                m_nview.GetZDO().Set(s_followKey, character.GetZDOID());
+            }
+        }
+
         private void Awake()
         {
             m_nview = GetComponent<ZNetView>();
@@ -133,6 +157,16 @@ namespace NhxMagicWeapons.Bosses
                 ZDO zdo = m_nview.GetZDO();
                 m_delay = zdo.GetFloat(s_delayKey, m_delay);
                 m_radius = zdo.GetFloat(s_radiusKey, m_radius);
+                ZDOID followed = zdo.GetZDOID(s_followKey);
+                if (!m_followed && !followed.IsNone() && ZNetScene.instance)
+                {
+                    GameObject found = ZNetScene.instance.FindInstance(followed);
+                    m_followed = found ? found.GetComponent<Character>() : null;
+                }
+            }
+            if (m_followed)
+            {
+                transform.position = m_followed.transform.position;
             }
             if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
             {
@@ -160,6 +194,7 @@ namespace NhxMagicWeapons.Bosses
             }
             float dt = Time.deltaTime;
             m_age += dt;
+            Move(dt);
             bool owner = m_nview && m_nview.IsValid() && m_nview.IsOwner();
             if (!m_struck && m_age >= m_delay)
             {
@@ -174,7 +209,30 @@ namespace NhxMagicWeapons.Bosses
             Draw(dt);
         }
 
-        // The lightning or the blast, and the hit for this game's player if they're within it
+        // Following: where its character stands on this game, its disc dropped onto the ground there every DropEvery.
+        // Gone (dead and removed, or out of this game), it stays where it was
+        private void Move(float dt)
+        {
+            if (!m_followed)
+            {
+                return;
+            }
+            transform.position = m_followed.transform.position;
+            m_dropTimer -= dt;
+            if (m_dropTimer > 0f || m_layerMeshes == null)
+            {
+                return;
+            }
+            m_dropTimer = DropEvery;
+            Drop();
+            foreach (Mesh mesh in m_layerMeshes)
+            {
+                mesh.vertices = m_vertices;
+                mesh.RecalculateBounds();
+            }
+        }
+
+        // The lightning or the blast, and the hit (or a pulse's kick) for this game's player if they're within it
         private void Strike(bool owner)
         {
             Vector3 point = transform.position;
@@ -183,14 +241,21 @@ namespace NhxMagicWeapons.Bosses
                 // Every game shows its own: the blast isn't networked
                 if (Wrath.Beam && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
                 {
-                    Wrath.Beam.ShowBlastOfRadius(point, m_radius, 1f);
+                    Wrath.Beam.ShowBlastOfRadius(point, m_radius, m_blastShake);
                 }
             }
             else if (owner && m_strike)
             {
                 StrikeLightning.SetLevel(Instantiate(m_strike, point, Quaternion.identity), m_strikeLevel);
             }
-            HitLocal(point);
+            if (m_kick)
+            {
+                TwinsPulse.Kick(m_followed, point, m_radius);
+            }
+            else
+            {
+                HitLocal(point);
+            }
         }
 
         // This game's player, if they're within it as it strikes here, and not rolling: its hit, on their own game
@@ -287,7 +352,7 @@ namespace NhxMagicWeapons.Bosses
             m_block = new MaterialPropertyBlock();
 
             int count = 1 + Rings * Segments;
-            Vector3[] vertices = new Vector3[count];
+            m_vertices = new Vector3[count];
             m_flat = new Vector2[count];
             m_uvs = new Vector2[count];
             for (int ring = 1; ring <= Rings; ring++)
@@ -299,18 +364,8 @@ namespace NhxMagicWeapons.Bosses
                     m_flat[1 + (ring - 1) * Segments + segment] = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
                 }
             }
-            // On the ground as it is here: it doesn't move
-            Vector3 center = transform.position;
-            for (int i = 0; i < count; i++)
-            {
-                Vector3 above = center + new Vector3(m_flat[i].x, GroundReach, m_flat[i].y);
-                float height = 0f;
-                if (Physics.Raycast(above, Vector3.down, out RaycastHit hit, 2f * GroundReach, StaffHits.GroundMask, QueryTriggerInteraction.Ignore))
-                {
-                    height = hit.point.y - center.y;
-                }
-                vertices[i] = new Vector3(m_flat[i].x, height + Lift, m_flat[i].y);
-            }
+            Drop();
+            Vector3[] vertices = m_vertices;
             List<int> triangles = new List<int>();
             for (int segment = 0; segment < Segments; segment++)
             {
@@ -365,6 +420,22 @@ namespace NhxMagicWeapons.Bosses
             m_light.range = LightRange;
             m_light.intensity = 0f;
             m_light.shadows = LightShadows.None;
+        }
+
+        // Its disc's vertices onto the ground as it is around where it stands now (once; a following rune's as it goes)
+        private void Drop()
+        {
+            Vector3 center = transform.position;
+            for (int i = 0; i < m_vertices.Length; i++)
+            {
+                Vector3 above = center + new Vector3(m_flat[i].x, GroundReach, m_flat[i].y);
+                float height = 0f;
+                if (Physics.Raycast(above, Vector3.down, out RaycastHit hit, 2f * GroundReach, StaffHits.GroundMask, QueryTriggerInteraction.Ignore))
+                {
+                    height = hit.point.y - center.y;
+                }
+                m_vertices[i] = new Vector3(m_flat[i].x, height + Lift, m_flat[i].y);
+            }
         }
 
         private void Draw(float dt)
