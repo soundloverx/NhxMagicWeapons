@@ -23,6 +23,13 @@ namespace NhxMagicWeapons.Bosses
     // affect pathing for the bosses [...] Perhaps the bosses should clip through other entities?"): a held creature
     // stands its ground against any push, and the game's paths don't go around creatures. So their colliders and the
     // twins' ignore each other (Physics.IgnoreCollision) while it's held; players still collide with both
+    // The bats of NhxExtraJewels' Cover of Darkness gem go instead (the user, 2026-11-20: "they appear quite often. It can
+    // cause a spam and also put many tiny frozen bats around the arena. DO you think the twins could just despawn them as
+    // they appear without any voice lines or anything"; the gem rolls on every hit, the twins' too). One in a ring of
+    // living twins is removed, not held, from their summon on (no HoldAfter: no line to wait for), by the game that runs
+    // it: as it starts (DismissNew), so it's gone before it's seen, or at the next refresh if it flies in. No effect, no
+    // rune, no line. Only the gem's bats (its mark in their ZDO: GemSummonKey); a wild bat is held as any creature, and
+    // so is the gem's spirit wolf (one at a time, then a cooldown)
     internal static class TwinsStasis
     {
         // Held from within the ring; kept held until this far past it (a flyer may drift, a push may move it)
@@ -37,9 +44,19 @@ namespace NhxMagicWeapons.Bosses
         // Two twins' arenas closer than this are the same
         private const float SameArena = 1f;
 
+        // NhxExtraJewels' mark on its summons and its number for a bat (its EffectHelpers\Summons.cs: KindKey, Kind.Bat),
+        // read without referencing that mod: keep the two in step
+        private static readonly int GemSummonKey = "NhxExtraJewels_summon".GetStableHashCode();
+        private const int GemBat = 2;
+
         private static readonly HashSet<Character> s_held = new HashSet<Character>();
         private static readonly Dictionary<Character, StasisRune> s_runes = new Dictionary<Character, StasisRune>();
+        // The arenas holding their creatures (their twins summoned HoldAfter ago), and all those of living twins, which
+        // the gem's bats leave at once
         private static readonly List<Vector3> s_arenas = new List<Vector3>();
+        private static readonly List<Vector3> s_liveArenas = new List<Vector3>();
+        private static readonly List<Character> s_dismissing = new List<Character>();
+        private static int s_dismissed;
         // For each arena, the twin that speaks for it (the living one with the lowest id, the same on every game), and
         // whether it has just held new creatures
         private static readonly List<CallerBoss> s_speakers = new List<CallerBoss>();
@@ -68,12 +85,20 @@ namespace NhxMagicWeapons.Bosses
             }
             s_timer = Interval;
             s_arenas.Clear();
+            s_liveArenas.Clear();
             s_speakers.Clear();
             s_cast.Clear();
             foreach (CallerBoss boss in CallerBoss.All)
             {
-                if (!boss || !boss.m_humanoid || boss.m_humanoid.IsDead() || !TwinsBond.Arena(boss, out Vector3 arena)
-                    || TwinsBond.Since(boss) < HoldAfter)
+                if (!boss || !boss.m_humanoid || boss.m_humanoid.IsDead() || !TwinsBond.Arena(boss, out Vector3 arena))
+                {
+                    continue;
+                }
+                if (!s_liveArenas.Exists(other => Utils.DistanceXZ(other, arena) < SameArena))
+                {
+                    s_liveArenas.Add(arena);
+                }
+                if (TwinsBond.Since(boss) < HoldAfter)
                 {
                     continue;
                 }
@@ -88,6 +113,28 @@ namespace NhxMagicWeapons.Bosses
                 {
                     s_speakers[index] = boss;
                 }
+            }
+
+            // The gem's bats that came in from outside, or were there before the twins
+            if (s_liveArenas.Count > 0)
+            {
+                s_dismissing.Clear();
+                foreach (Character character in Character.GetAllCharacters())
+                {
+                    if (Unwelcome(character))
+                    {
+                        s_dismissing.Add(character);
+                    }
+                }
+                foreach (Character bat in s_dismissing)
+                {
+                    Dismiss(bat);
+                }
+            }
+            if (s_dismissed > 0)
+            {
+                TwinsLog.Event($"Dismissed {s_dismissed} gem bat(s) from the arena.");
+                s_dismissed = 0;
             }
 
             UpdateTwinColliders();
@@ -115,7 +162,7 @@ namespace NhxMagicWeapons.Bosses
             {
                 foreach (Character character in Character.GetAllCharacters())
                 {
-                    int arena = Holdable(character) ? ArenaOf(character, TwinsAltars.ArenaRadius) : -1;
+                    int arena = Holdable(character) ? ArenaOf(s_arenas, character, TwinsAltars.ArenaRadius) : -1;
                     if (arena >= 0 && s_held.Add(character))
                     {
                         s_cast[arena]++;
@@ -221,13 +268,13 @@ namespace NhxMagicWeapons.Bosses
             return colliders;
         }
 
-        // Which arena `character` is within `radius` of, or -1
-        private static int ArenaOf(Character character, float radius)
+        // Which of `arenas` `character` is within `radius` of, or -1
+        private static int ArenaOf(List<Vector3> arenas, Character character, float radius)
         {
             Vector3 position = character.transform.position;
-            for (int i = 0; i < s_arenas.Count; i++)
+            for (int i = 0; i < arenas.Count; i++)
             {
-                if (Utils.DistanceXZ(position, s_arenas[i]) <= radius)
+                if (Utils.DistanceXZ(position, arenas[i]) <= radius)
                 {
                     return i;
                 }
@@ -237,13 +284,48 @@ namespace NhxMagicWeapons.Bosses
 
         // Tames too (the user: "The tames should also freeze when the bosses spawn. My friend loves carrying an army of
         // fairies with him and I don't want them to be of any use during the fight haha"): anything with an AI but the
-        // players and the twins, whoever it follows
+        // players and the twins, whoever it follows; not the gem's bats, which go (Unwelcome), nor anything already gone
+        // from the network (a bat just dismissed, there until the frame ends)
         private static bool Holdable(Character character)
         {
-            return character && !character.IsDead() && !character.IsPlayer() && !CallerBoss.IsTwin(character) && character.GetBaseAI();
+            return character && character.m_nview && character.m_nview.IsValid() && !character.IsDead() && !character.IsPlayer()
+                && !CallerBoss.IsTwin(character) && character.GetBaseAI() && !IsGemBat(character);
         }
 
-        private static bool Within(Character character, float radius) => ArenaOf(character, radius) >= 0;
+        private static bool Within(Character character, float radius) => ArenaOf(s_arenas, character, radius) >= 0;
+
+        // A bat of NhxExtraJewels' Cover of Darkness gem, from the mark it leaves in the bat's ZDO
+        private static bool IsGemBat(Character character)
+        {
+            ZDO zdo = character && character.m_nview && character.m_nview.IsValid() ? character.m_nview.GetZDO() : null;
+            return zdo != null && zdo.GetInt(GemSummonKey) == GemBat;
+        }
+
+        // A gem bat in a ring of living twins
+        private static bool Unwelcome(Character character)
+        {
+            return IsGemBat(character) && ArenaOf(s_liveArenas, character, TwinsAltars.ArenaRadius) >= 0;
+        }
+
+        // Gone, silently (no death, effect or drop), on the game that runs it; the others lose it with its ZDO
+        private static void Dismiss(Character bat)
+        {
+            if (bat.m_nview.IsOwner())
+            {
+                ZNetScene.instance.Destroy(bat.gameObject);
+                s_dismissed++;
+            }
+        }
+
+        // A gem bat starting in a ring goes before it's drawn: NhxExtraJewels marks it right after making it, and Start
+        // comes after that, before its first frame
+        private static void DismissNew(Character character)
+        {
+            if (s_liveArenas.Count > 0 && Unwelcome(character))
+            {
+                Dismiss(character);
+            }
+        }
 
         // A rune for each creature held, on every game but a dedicated server; the rest fade away
         private static void UpdateRunes()
@@ -299,6 +381,19 @@ namespace NhxMagicWeapons.Bosses
         private static class HoldAnimal
         {
             private static bool Prefix(AnimalAI __instance, ref bool __result) => Hold(__instance, ref __result);
+        }
+
+        // Character.Start is empty and Humanoid.Start (a biting creature's, as a bat) doesn't call it: both
+        [HarmonyPatch(typeof(Character), nameof(Character.Start))]
+        private static class DismissNewCharacter
+        {
+            private static void Postfix(Character __instance) => DismissNew(__instance);
+        }
+
+        [HarmonyPatch(typeof(Humanoid), nameof(Humanoid.Start))]
+        private static class DismissNewHumanoid
+        {
+            private static void Postfix(Humanoid __instance) => DismissNew(__instance);
         }
 
         // Nothing hurts a held creature, on its own game, before anything is taken
