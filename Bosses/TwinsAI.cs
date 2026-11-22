@@ -19,7 +19,8 @@ namespace NhxMagicWeapons.Bosses
     //   nearest. The fight's redesign, agreed with the user 2026-11-15: alone with one player, the only staff that hurts
     //   the survivor is the fallen twin's, so by the rules above it would have stood and watched to the end
     // Its AI goes after that target (UpdateTarget); the attacks, moves and the rest are the game's, but a hunter closes in
-    // on its quarry, where the game's AI would stop as soon as its attack in hand reaches them (Close)
+    // on its quarry, where the game's AI would stop as soon as its attack in hand reaches them (Close), and in an arena
+    // every move is a straight walk, not the game's path (Straight)
     internal static class TwinsAI
     {
         // A watcher's spell waits this many times its interval
@@ -215,7 +216,7 @@ namespace NhxMagicWeapons.Bosses
         }
 
         // A twin with a player to go after goes after them, seen or not: the game's AI otherwise walks to where it last
-        // saw them and wanders there (MonsterAI.UpdateAI, its view being 40 m in an arena 80 m across), and drops a target
+        // saw them and wanders there (MonsterAI.UpdateAI, its view being 40 m in an arena 60 m across), and drops a target
         // it hasn't attacked for a minute; hunting a player, it doesn't
         [HarmonyPatch(typeof(MonsterAI), nameof(MonsterAI.HuntPlayer))]
         private static class Pursue
@@ -337,6 +338,43 @@ namespace NhxMagicWeapons.Bosses
                 }
                 s_moveTo?.Invoke(__instance, dt, quarry.transform.position, CloseGap, true);
             }
+        }
+
+        // In an arena, a twin walks straight at where it's going, as BaseAI.MoveTo would but with no path: stopping within
+        // `dist` (at least a step), true once there. The user, 2026-11-22: "Fix the chase, make the bosses only collide
+        // with the edge of the arena": in a test fight the game's paths there were partial for 79 of a hunter's 194
+        // (TwinsMoveLog), and a hunter on one walked away from its quarry to the ring's edge until its rush. The arena is
+        // leveled and cleared, and the twins pass through what stands on it (TwinsStasis.PassThrough), so only the ring
+        // (TwinsRing, which holds them) and the players stop them. Every move of theirs: Close's, the game's chase, a
+        // watcher coming within reach of its spell. Twins with no arena (devcommands' spawn) keep the game's paths
+        [HarmonyPatch(typeof(BaseAI), "MoveTo")]
+        private static class Straight
+        {
+            private static bool Prefix(BaseAI __instance, Vector3 point, float dist, bool run, ref bool __result)
+            {
+                if (!WalksStraight(__instance))
+                {
+                    return true;
+                }
+                Vector3 to = point - __instance.transform.position;
+                to.y = 0f;
+                float distance = to.magnitude;
+                if (distance < Mathf.Max(dist, run ? 1f : 0.5f))
+                {
+                    __instance.StopMoving();
+                    __result = true;
+                    return false;
+                }
+                __instance.MoveTowards(to / distance, run);
+                __result = false;
+                return false;
+            }
+        }
+
+        // A twin in an arena (TwinsMoveLog says so of its moves)
+        internal static bool WalksStraight(BaseAI ai)
+        {
+            return CallerBoss.ByAI.TryGetValue(ai, out CallerBoss boss) && boss && TwinsBond.Arena(boss, out _);
         }
 
         // A twin with nothing to cast stands and watches its player, rather than wandering about (alerted, the game's

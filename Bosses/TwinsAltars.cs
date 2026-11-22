@@ -15,8 +15,13 @@ namespace NhxMagicWeapons.Bosses
     // - The arena: Stones twisted pillar bases ArenaRadius out, each crowned with a floating crystal, storm and fire in
     //   turn, with a light and motes, standing at the dais's ground height (the leveled arena's; BuildStones). While
     //   the twins live, the ring is drawn along them (RingLook), and holds whoever is inside (TwinsRing)
-    // - The ground leveled and cleared about the dais (TerrainModifier), and no building within NoBuildRadius (the
-    //   game's no-build zone of locations: Location.m_noBuild, as at its boss altars)
+    // - The ground leveled and cleared about the dais out to GroundRadius (TerrainModifier), and no building within
+    //   NoBuildRadius (the game's no-build zone of locations: Location.m_noBuild, as at its boss altars)
+    // The ring was 40 m, as the ground, until the user's 30 (2026-11-22, after a test fight: "It's big and maybe it also
+    // affects the twins giving up on pursuit?"): a player could run straight on, ahead of a hunter, and the watcher's
+    // flashes left it at the far edge. The ground stayed at 40, so altars already in a world keep their land (the
+    // location's looks, the ring and its stones with them, are made again from here wherever an altar loads), with a
+    // flat margin past the stones
     // Built as the game builds its locations: every game makes the location's looks from a networked LocationProxy, so an
     // altar placed by command is the same as a generated one.
     // Where (the user: "3 generated altars plus an admin command for one [...] careful not to overlap with other
@@ -31,7 +36,8 @@ namespace NhxMagicWeapons.Bosses
     internal static class TwinsAltars
     {
         internal const string LocationName = "NhxTwinsAltar";
-        internal const float ArenaRadius = 40f;
+        internal const float ArenaRadius = 30f;
+        private const float GroundRadius = 40f;
         private const float NoBuildRadius = 46f;
         private const int Quantity = 3;
         private const int Stones = 12;
@@ -79,14 +85,14 @@ namespace NhxMagicWeapons.Bosses
             dais.transform.SetParent(root.transform, false);
             dais.AddComponent<TwinsAltar>();
 
-            // The whole arena leveled to the dais's ground, blending into the land just past the stones (the user: "Do you
+            // The whole arena leveled to the dais's ground, blending into the land past GroundRadius (the user: "Do you
             // think the area can be leveled [...]?"; at first only the dais's 7 m was); the dais's ground cleared
             TerrainModifier terrain = root.AddComponent<TerrainModifier>();
             terrain.m_level = true;
-            terrain.m_levelRadius = ArenaRadius + 2f;
+            terrain.m_levelRadius = GroundRadius + 2f;
             terrain.m_square = false;
             terrain.m_smooth = true;
-            terrain.m_smoothRadius = ArenaRadius + 8f;
+            terrain.m_smoothRadius = GroundRadius + 8f;
             terrain.m_paintCleared = true;
             terrain.m_paintRadius = 8f;
             terrain.m_paintType = TerrainModifier.PaintType.Dirt;
@@ -98,6 +104,10 @@ namespace NhxMagicWeapons.Bosses
             RingLook ring = root.AddComponent<RingLook>();
             ring.m_radius = ArenaRadius;
             ring.m_stones = Stones;
+            // The altar's wave, seen (WaveLook; the wave itself: TwinsWave)
+            WaveLook wave = root.AddComponent<WaveLook>();
+            wave.m_radius = ArenaRadius;
+            wave.m_stones = Stones;
             if (s_missing.Count > 0)
             {
                 Plugin.Log.LogWarning("The twins' altar is without: " + string.Join(", ", s_missing) + " (not in the game).");
@@ -117,10 +127,13 @@ namespace NhxMagicWeapons.Bosses
             }));
         }
 
+        // The dais's floor: ground, which the twins walk on (TwinsAltar.Solids leaves it out)
+        internal const string FloorPrefab = "Ashlands_Ruins_Floor_6x6";
+
         // The ruined floor, its rune rings, the broken pillars at its corners and the twins' crystals over it
         private static void BuildDais(Transform root)
         {
-            GameObject floor = Looks.Copy("Ashlands_Ruins_Floor_6x6", root, Vector3.zero, Quaternion.identity, 1f, s_missing);
+            GameObject floor = Looks.Copy(FloorPrefab, root, Vector3.zero, Quaternion.identity, 1f, s_missing);
             float top = 0.3f;
             if (floor)
             {
@@ -143,7 +156,7 @@ namespace NhxMagicWeapons.Bosses
         }
 
         // The arena's edge: twisted pillar bases crowned with crystals, storm and fire in turn. At the root's height, not
-        // snapped to the ground: the arena is leveled to exactly that out to ArenaRadius + 2 (Heightmap.LevelTerrain), but
+        // snapped to the ground: the arena is leveled to exactly that out to GroundRadius + 2 (Heightmap.LevelTerrain), but
         // a SnapToGround snaps as the looks are built, before the leveling is in the heightmap, so it found the land as
         // it was (the user, 2026-11-15: "some are left floating and others get buried"). It was there from when only the
         // dais was leveled
@@ -458,7 +471,7 @@ namespace NhxMagicWeapons.Bosses
 
         // The arena cleared of what the world had grown or left on it (the user, 2026-11-15: "it was full of debris which
         // prevented the bosses from teleporting next to me. Do you think the area can be leveled and everything on it
-        // removed when placing the altar?"): every object within ArenaRadius + ClearMargin of `point` that's vegetation
+        // removed when placing the altar?"): every object within GroundRadius + ClearMargin of `point` that's vegetation
         // (the game's vegetation list: rocks, trees, bushes, plants) or debris (rocks and ore that break, trees and logs,
         // things that break, things to pick), and that no player built; never a building piece, a creature or an item.
         // A world generated with the altar never grows any there (its location clears its area); one placed later
@@ -476,7 +489,7 @@ namespace NhxMagicWeapons.Bosses
                     vegetation.Add(entry.m_prefab.name.GetStableHashCode());
                 }
             }
-            float reach = ArenaRadius + ClearMargin;
+            float reach = GroundRadius + ClearMargin;
             List<ZDO> doomed = new List<ZDO>();
             Dictionary<int, bool> debris = new Dictionary<int, bool>();
             foreach (ZDO zdo in ZDOMan.instance.m_objectsByID.Values)
@@ -832,7 +845,7 @@ namespace NhxMagicWeapons.Bosses
             float center = world.GetHeight(point.x, point.z);
             for (int ring = 0; ring <= 4; ring++)
             {
-                float distance = ArenaRadius * ring / 4f;
+                float distance = GroundRadius * ring / 4f;
                 for (int i = 0; i < (ring == 0 ? 1 : 8); i++)
                 {
                     Vector3 sample = point + Quaternion.AngleAxis(45f * i, Vector3.up) * Vector3.forward * distance;
@@ -850,7 +863,7 @@ namespace NhxMagicWeapons.Bosses
                 return false;
             }
             Vector2Int cell = Cell(point);
-            int cells = Mathf.CeilToInt((ArenaRadius + BaseMargin) / CellSize);
+            int cells = Mathf.CeilToInt((GroundRadius + BaseMargin) / CellSize);
             for (int x = -cells; x <= cells; x++)
             {
                 for (int z = -cells; z <= cells; z++)
@@ -891,6 +904,60 @@ namespace NhxMagicWeapons.Bosses
     // redesign, any twin within 90 m)
     internal class TwinsAltar : MonoBehaviour, Hoverable, Interactable
     {
+        // The altars on this game, and a count of their comings and goings (TwinsStasis.PassThrough: the twins pass through
+        // what stands on an altar's arena, once it's there)
+        internal static readonly List<TwinsAltar> All = new List<TwinsAltar>();
+        internal static int Version { get; private set; }
+        private Collider[] m_solids;
+
+        private void Awake()
+        {
+            All.Add(this);
+            Version++;
+        }
+
+        private void OnDestroy()
+        {
+            All.Remove(this);
+            Version++;
+        }
+
+        // What of the altar a twin would bump into: every piece's collider (the dais's pillars and crystals, the ring's
+        // stones and theirs), but not the dais's floor, which is ground. The location's root holds them all
+        internal Collider[] Solids
+        {
+            get
+            {
+                if (m_solids != null)
+                {
+                    return m_solids;
+                }
+                Transform root = transform.parent ? transform.parent : transform;
+                List<Collider> solids = new List<Collider>();
+                foreach (Collider collider in root.GetComponentsInChildren<Collider>(true))
+                {
+                    if (!collider.isTrigger && !OnFloor(collider.transform, root))
+                    {
+                        solids.Add(collider);
+                    }
+                }
+                m_solids = solids.ToArray();
+                return m_solids;
+            }
+        }
+
+        private static bool OnFloor(Transform part, Transform root)
+        {
+            for (Transform at = part; at && at != root; at = at.parent)
+            {
+                if (at.name == TwinsAltars.FloorPrefab)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public string GetHoverText()
         {
             return Localization.instance.Localize("$piece_nhx_twins_altar\n[<color=yellow><b>1-8</b></color>] $piece_nhx_twins_offer\n<color=orange>$piece_nhx_twins_warning</color>");

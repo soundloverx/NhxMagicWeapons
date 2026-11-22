@@ -1,3 +1,4 @@
+using HarmonyLib;
 using Jotunn.Entities;
 using Jotunn.Managers;
 using UnityEngine;
@@ -29,7 +30,12 @@ namespace NhxMagicWeapons.Bosses
     // (2026-11-20), after running out of stamina with the Firecaller on them: "boost stamina regen once I have one Storm
     // staff debuff and boost eitr regen once I have one Muspelheim staff debuff [...] the regen boosts would have no
     // effect if I am holding the opposite staff"; then "the boost must be flat, not increasing with the stacks". Draining,
-    // it does nothing either way
+    // it does nothing either way.
+    // Its own resource's regen is capped, not only slowed (the user, 2026-11-22: "Let's go with A"): in a test fight a
+    // player's meads, Rested and gear had eitr regen at x4.5, and a Static of 3 still left x2.6, so neither resource was
+    // ever short. With every effect on the player (and for eitr the gear's, which Player.UpdateStats adds after them),
+    // it's at most what the charge leaves: x0.8 at 1 stack, x0.4 at 3, none from 5 (Ceiling). The boost to the other
+    // stays a share of the rest
     internal class ElementCharge : StatusEffect
     {
         internal const string StaticName = "SE_NhxStatic";
@@ -97,6 +103,50 @@ namespace NhxMagicWeapons.Bosses
         public override void ModifyStaminaRegen(ref float staminaRegen)
         {
             staminaRegen *= m_element == HitData.DamageType.Fire ? Left : Boost;
+        }
+
+        // The cap on `element`'s resource for this SEMan's character: what its charge of that element leaves, in hand from
+        // its first stack (none before, or draining)
+        private static bool Ceiling(SEMan seman, HitData.DamageType element, out float ceiling)
+        {
+            ceiling = 1f;
+            foreach (StatusEffect effect in seman.GetStatusEffects())
+            {
+                if (effect is ElementCharge charge && charge.m_element == element && !charge.m_draining && charge.m_stacks >= 1)
+                {
+                    ceiling = charge.Left;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Static's cap on eitr regen, after every effect's share (SEMan's). The gear's comes after it in Player.UpdateStats,
+        // so what's left for the effects is the cap less the gear's: the sum is at most the cap (and never below none)
+        [HarmonyPatch(typeof(SEMan), nameof(SEMan.ModifyEitrRegen))]
+        private static class EitrCeiling
+        {
+            private static void Postfix(SEMan __instance, ref float eitrMultiplier)
+            {
+                if (Ceiling(__instance, HitData.DamageType.Lightning, out float ceiling))
+                {
+                    float gear = __instance.m_character is Player player ? player.GetEquipmentEitrRegenModifier() : 0f;
+                    eitrMultiplier = Mathf.Min(eitrMultiplier, ceiling - gear);
+                }
+            }
+        }
+
+        // Scorch's cap on stamina regen (nothing is added after it there)
+        [HarmonyPatch(typeof(SEMan), nameof(SEMan.ModifyStaminaRegen))]
+        private static class StaminaCeiling
+        {
+            private static void Postfix(SEMan __instance, ref float staminaMultiplier)
+            {
+                if (Ceiling(__instance, HitData.DamageType.Fire, out float ceiling))
+                {
+                    staminaMultiplier = Mathf.Min(staminaMultiplier, ceiling);
+                }
+            }
         }
 
         public override string GetIconText()

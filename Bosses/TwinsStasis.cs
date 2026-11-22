@@ -194,7 +194,10 @@ namespace NhxMagicWeapons.Bosses
         }
 
         // The twins' colliders, looked up again only when the twins on this game have changed; then every held creature
-        // is set apart from them again (s_apart)
+        // is set apart from them again (s_apart), and they're set apart from each other and the altars (PassThrough), as
+        // they are when an altar comes or goes
+        private static int s_altarsSeen = -1;
+
         private static void UpdateTwinColliders()
         {
             s_twinsNow.Clear();
@@ -210,19 +213,67 @@ namespace NhxMagicWeapons.Bosses
             {
                 same = s_twinsNow[i] == s_twinsBefore[i];
             }
-            if (same)
+            if (same && s_altarsSeen == TwinsAltar.Version)
             {
                 return;
             }
-            s_twinsBefore.Clear();
-            s_twinsBefore.AddRange(s_twinsNow);
-            s_twinColliders.Clear();
-            foreach (Character twin in s_twinsNow)
+            s_altarsSeen = TwinsAltar.Version;
+            if (!same)
             {
-                s_twinColliders.AddRange(Solid(twin));
+                s_twinsBefore.Clear();
+                s_twinsBefore.AddRange(s_twinsNow);
+                s_twinColliders.Clear();
+                foreach (Character twin in s_twinsNow)
+                {
+                    s_twinColliders.AddRange(Solid(twin));
+                }
+                s_apart.Clear();
             }
-            s_apart.Clear();
+            PassThrough();
         }
+
+        // The twins pass through each other and through what stands on their arenas, the ground aside: the altar's
+        // pillars, stones and crystals (TwinsAltar.Solids). The user, 2026-11-22: "make the bosses only collide with the
+        // edge of the arena", as they now walk straight at where they're going there (TwinsAI.Straight); held creatures
+        // they already passed through (Collide). Players still stop them, and the ring holds them (TwinsRing)
+        private static void PassThrough()
+        {
+            for (int i = 0; i < s_twinsNow.Count; i++)
+            {
+                for (int j = i + 1; j < s_twinsNow.Count; j++)
+                {
+                    Ignore(Solid(s_twinsNow[i]), Solid(s_twinsNow[j]));
+                }
+            }
+            foreach (TwinsAltar altar in TwinsAltar.All)
+            {
+                if (altar && altar.gameObject.activeInHierarchy)
+                {
+                    Ignore(s_twinColliders, altar.Solids);
+                }
+            }
+        }
+
+        // Each of `these` and each of `those` pass through each other (both must be active: the game says so otherwise)
+        private static void Ignore(IList<Collider> these, IList<Collider> those)
+        {
+            foreach (Collider one in these)
+            {
+                if (!Active(one))
+                {
+                    continue;
+                }
+                foreach (Collider other in those)
+                {
+                    if (Active(other))
+                    {
+                        Physics.IgnoreCollision(one, other, true);
+                    }
+                }
+            }
+        }
+
+        private static bool Active(Collider collider) => collider && collider.enabled && collider.gameObject.activeInHierarchy;
 
         // Whether the twins and `character` bump into each other
         private static void Collide(Character character, bool collide)

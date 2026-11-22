@@ -49,7 +49,7 @@ namespace NhxMagicWeapons.Bosses
         // A hunter whose quarry has stayed out of reach (meters: a little past the Firecaller's flames, the Stormcaller's
         // bolt) for ChaseDelay seconds rushes at it, as at a player who drew its staff, at most every RushCooldown (the
         // user, 2026-11-14: "the bosses might want to blink closer from time to time anyway"): a player can outrun them
-        // (sprinting, 7 m/s; they run at 5), or stand where they can't walk
+        // (sprinting, 7 m/s; they run at 5.5: CallerBosses.RunSpeed), or stand where they can't walk
         private const float FireReach = 14f;
         private const float StormReach = 26f;
         private const float ChaseDelay = 4f;
@@ -65,11 +65,12 @@ namespace NhxMagicWeapons.Bosses
         // FlashBehind beyond its twin on the line from the player, no further than FlashMaxFromPlayer from them: the twin
         // chasing them can't be hurt by their staff and stops shots aimed through it, so they have to move, or drag it
         // aside, to have the watcher in sight again. A share of its health, so CLLC's scaling changes nothing of it
-        // (Evade)
+        // (Evade). No further than 20 m from them since the ring shrank to 30 m (2026-11-22): at 30, in a test fight, the
+        // watcher's 21 flashes went 25 to 39 m and often left it at the arena's edge
         private const float FlashShare = 0.04f;
         private const float FlashCooldown = 8f;
         private const float FlashBehind = 8f;
-        private const float FlashMaxFromPlayer = 30f;
+        private const float FlashMaxFromPlayer = 20f;
         // Its ward shows at most this often (seconds), and for a hit through its middle (a blast, Lightning Step, the
         // comet: nearer its axis than WardNear), this far from it toward whoever struck (meters)
         private const float WardEvery = 0.15f;
@@ -561,7 +562,7 @@ namespace NhxMagicWeapons.Bosses
             m_answerAt = Time.time + TwinsDuel.AnswerDelay;
             m_answerPoint = point;
             TwinsLog.Event($"{TwinsLog.Name(this)} answers {TwinsLog.Name(player)}'s swap to a clean staff: its rune at {TwinsLog.At(point)}"
-                + $"{(rune ? "" : " (missing)")}, striking for {TwinsDuel.SwapDamage:0} in {TwinsDuel.AnswerDelay:0.0} s.");
+                + $"{(rune ? "" : " (missing)")}, striking for {TwinsDuel.AnswerDamage:0} in {TwinsDuel.AnswerDelay:0.0} s.");
         }
 
         // Its rune strikes (RPC_Punish), and it lands on it: unless it's in the middle of an attack, or stands for its

@@ -131,6 +131,19 @@ namespace NhxMagicWeapons.Bosses
         [HarmonyPatch(typeof(Game), "RPC_DiscoverLocationResponse")]
         private static class Answer
         {
+            // The answer opens the map on the altar (showMap). With the inventory open (the lodestone used from it, or
+            // from the hotbar at a chest) the game locked, each waiting for the other to close: InventoryGui.Update
+            // doesn't close it while the map is open, and Minimap.Update takes no key while the inventory shows (the
+            // user, 2026-11-22: "it opened the map under the inventory and AzuEPI UI. Then I couldn't close anything
+            // anymore"). So the inventory closes first
+            private static void Prefix(string pinName, bool showMap)
+            {
+                if (pinName == PinName && showMap && InventoryGui.instance && InventoryGui.IsVisible())
+                {
+                    InventoryGui.instance.Hide();
+                }
+            }
+
             private static void Postfix(string pinName)
             {
                 if (pinName == PinName && s_askedAt >= 0f)

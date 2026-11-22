@@ -83,7 +83,8 @@ namespace NhxMagicWeapons.Bosses
         private const float CometRuneRadius = 2.5f;
         private const float CometPast = 5f;
         private const float CometWidth = 2f;
-        private const float CometDamage = 150f;
+        // 150 until the twins' damage went up (the user, 2026-11-22: BossAttacks)
+        private const float CometDamage = 225f;
         // Its way, sent to every game to judge its own player (Burn)
         private const string CometRpc = "NhxTwinsComet";
         private const float CometPush = 30f;

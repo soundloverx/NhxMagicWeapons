@@ -21,7 +21,7 @@ namespace NhxMagicWeapons
     {
         internal const string PluginGuid = "NhxMagicWeapons";
         private const string PluginName = "NhxMagicWeapons";
-        private const string PluginVersion = "2.0.0";
+        private const string PluginVersion = "2.1.0";
 
         // What the mod uses of Magic Supremacy 3.1.5's asset bundle (Tools\slim_bundle.py), embedded in the DLL
         private const string BundleResource = "nhx_magic_weapons";
@@ -31,6 +31,9 @@ namespace NhxMagicWeapons
         // The twins' fight in the log (Bosses\TwinsLog), off unless asked for (the user, 2026-11-15, the fight tested:
         // "maybe disable them so as not to spam the player so much"; kept for a later round of balancing)
         internal static ConfigEntry<bool> TwinsFightLog { get; private set; }
+        // The twins' movement in the log (Bosses\TwinsMoveLog), apart from the fight log and off unless asked for (the
+        // user, 2026-11-22: "it should be easy to turn off because I imagine the log spam")
+        internal static ConfigEntry<bool> TwinsMoveLog { get; private set; }
 
         // Unity reads the bundle from it as its assets are loaded, so it stays open for as long as the game runs
         private static Stream s_bundleStream;
@@ -38,6 +41,8 @@ namespace NhxMagicWeapons
         private void Awake()
         {
             Log = Logger;
+            TwinsMoveLog = Config.Bind("Debug", "Twins movement log", false,
+                "Write how the Stormcaller and Firecaller move to BepInEx's LogOutput.log, a line for each every second on the game that runs them: where they are, how far from their target and whether they gain on them, their speed and heading, what holds them, and what their AI told them to do. Apart from the fight log, and much more of it. For testing.");
             TwinsFightLog = Config.Bind("Debug", "Twins fight log", false,
                 "Write the Stormcaller and Firecaller fight to BepInEx's LogOutput.log: every hit on the twins and on your character near them (from whom, with what, resistances, damage taken), and the fight's events (targets, voice lines, deaths, raises, holds, swaps, stacks, Stormstruck and Flamestruck), with a summary when you leave the fight. For testing and balancing.");
 
@@ -71,10 +76,12 @@ namespace NhxMagicWeapons
         private void Update()
         {
             Bosses.TwinsDuel.Update(Time.deltaTime);
+            Bosses.TwinsWave.Update();
             Bosses.TwinsItems.Update();
             Bosses.TwinsStasis.Update(Time.deltaTime);
             Bosses.TwinsVoices.Update();
             Bosses.TwinsLog.Update(Time.deltaTime);
+            Bosses.TwinsMoveLog.Update(Time.deltaTime);
         }
 
         // The weapons copy settings and effects from the game's own, which are only there once the main menu loads, and the

@@ -60,6 +60,14 @@ namespace NhxMagicWeapons.Bosses
         private bool m_called;
         private float m_checkTimer;
         private float m_arcTimer;
+        // The altar's wave reaching the ring (WaveLook): 0 to 1, how much it flares the band, its veil and the arcs (30%
+        // less after the second test: "it's a bit too much")
+        private float m_pulse;
+        private const float PulseBand = 1.75f;
+        private const float PulseVeil = 2.1f;
+        private const float PulseArcs = 1.05f;
+
+        internal void Pulse(float amount) => m_pulse = Mathf.Clamp01(amount);
 
         private void Start()
         {
@@ -213,8 +221,8 @@ namespace NhxMagicWeapons.Bosses
         private void Draw()
         {
             float breath = 1f + Breath * Mathf.Sin(2f * Mathf.PI * Time.time / BreathTime);
-            Tint(m_band, BandBright * breath);
-            Tint(m_veil, VeilBright * breath);
+            Tint(m_band, BandBright * breath * (1f + PulseBand * m_pulse));
+            Tint(m_veil, VeilBright * breath * (1f + PulseVeil * m_pulse));
             m_arcTimer -= Time.deltaTime;
             if (m_arcTimer <= 0f)
             {
@@ -223,8 +231,8 @@ namespace NhxMagicWeapons.Bosses
             }
             for (int i = 0; i < m_arcs.Length; i++)
             {
-                Color from = StoneColor(i) * ArcBright;
-                Color to = StoneColor(i + 1) * ArcBright;
+                Color from = StoneColor(i) * ArcBright * (1f + PulseArcs * m_pulse);
+                Color to = StoneColor(i + 1) * ArcBright * (1f + PulseArcs * m_pulse);
                 from.a = to.a = m_shown;
                 m_arcs[i].startColor = from;
                 m_arcs[i].endColor = to;

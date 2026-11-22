@@ -56,28 +56,33 @@ namespace NhxMagicWeapons.Bosses
 
         // The Stormcaller's call (its watcher's spell, and a hunter's from afar): within 35 m, every 6 s at most, with the
         // Staff of Protection's raised-staff animation (the staff's strike's), the rune 2 s ahead of the strike, which hits
-        // 3.5 m around (the staff's), for 200 lightning
+        // 3.5 m around (the staff's), for 300 lightning.
+        // The twins' damage was half again or more (the user, 2026-11-22, after a test fight with a character as strong as
+        // their real one: "extremely easy [...] we can increase the chase speed and the damage done (the numbers that aren't
+        // currently a percentage of total life)"): their hits stayed under twice the player's armor, where armor takes
+        // most of a hit, so ~1.5x the hit lands ~2.25x. The call 200 -> 300, the bolt 120 -> 200, the sigil 180 -> 270,
+        // the flames 100 -> 150 (and TwinsStorm's rain, TwinsPhase's comet, TwinsDuel's swap rune)
         private const float CallRange = 35f;
         private const float CallInterval = 6f;
         private const string CallAnimation = "staff_shield";
         private const float CallDelay = 2f;
-        private const float CallLightning = 200f;
+        private const float CallLightning = 300f;
 
         // The Stormcaller's bolt from its hands (BossBolt), a hunter's (it brings the Stormcaller in after a player): within
         // 20 m, every 5 s at most, on the held flamethrower animation (both hands out): 5 puffs of charge (1 s), then the
-        // bolt, reaching 30 m from its hands, for 120 lightning, half the usual stagger (lightning staggers: a full 120 would
-        // nearly always), chaining as the staff at level 10 (half the time, up to 5 jumps), looking like the staff's at 15.
-        // It walks on as it charges (the user, 2026-11-20: "I would have the Stormcaller move while charging his hunter
-        // lightning too", as the hunters close in: TwinsAI.Close), at BoltMove of its speed (3 m/s running: a jogging player
-        // gains on it a little), turning freely: where the bolt goes was set as the charge began (BossBolt)
+        // bolt, reaching 30 m from its hands, for 200 lightning, with 60 of stagger as at 120 with half the usual (lightning
+        // staggers: a full 120 nearly always did), chaining as the staff at level 10 (half the time, up to 5 jumps), looking
+        // like the staff's at 15. It walks on as it charges (the user, 2026-11-20: "I would have the Stormcaller move while
+        // charging his hunter lightning too", as the hunters close in: TwinsAI.Close), at BoltMove of its speed (3.3 m/s
+        // running: a jogging player gains on it), turning freely: where the bolt goes was set as the charge began (BossBolt)
         private const float BoltRange = 20f;
         private const float BoltMove = 0.6f;
         private const float BoltTurn = 1f;
         private const float BoltInterval = 5f;
         private const int BoltCharge = 5;
         private const float BoltReach = 30f;
-        private const float BoltLightning = 120f;
-        private const float BoltStagger = 0.5f;
+        private const float BoltLightning = 200f;
+        private const float BoltStagger = 0.3f;
         private const int BoltChainLevel = 10;
         private const int BoltLookLevel = 15;
         private const string BoltName = "NhxStormcallerBolt";
@@ -85,16 +90,16 @@ namespace NhxMagicWeapons.Bosses
 
         // The Firecaller's sigil, the call's twin (its watcher's spell, and a hunter's from afar): within 35 m, every 6 s at
         // most, with the Staff of Embers' own cast (the staff's bolt's: a thrust of the hands), its rune 2 s ahead of an
-        // eruption 3.5 m around, for 180 fire (fire burns on: SE_Burning)
+        // eruption 3.5 m around, for 270 fire (fire burns on: SE_Burning)
         private const float SigilRange = 35f;
         private const float SigilInterval = 6f;
         private const float SigilDelay = 2f;
         private const float SigilRadius = 3.5f;
-        private const float SigilFire = 180f;
+        private const float SigilFire = 270f;
 
         // The Firecaller's flames: within 9 m, every 7 s at most, a puff every 0.2 s (the staff's): 5 of wind-up (1 s), 13
         // of flames (2.6 s) drawn 12 m long, burning 10 m out from the 3rd on, once they've flown there, and every 3rd
-        // after (4 burns, 0.6 s apart) for 100 fire each; meanwhile it doesn't move and turns at a quarter of its speed
+        // after (4 burns, 0.6 s apart) for 150 fire each; meanwhile it doesn't move and turns at a quarter of its speed
         // (150 degrees a second: 37.5). A light push: the flames shove, they don't blast (the strike's is the staff's)
         private const float FlamesRange = 9f;
         private const float FlamesInterval = 7f;
@@ -105,7 +110,7 @@ namespace NhxMagicWeapons.Bosses
         private const int BurnEvery = 3;
         private const float FlamesDrawn = 12f;
         private const float FlamesReach = 10f;
-        private const float FlamesFire = 100f;
+        private const float FlamesFire = 150f;
         private const float FlamesTurn = 0.25f;
         private const float FlamesForce = 15f;
 

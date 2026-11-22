@@ -160,6 +160,10 @@
     <Compile Include="Bosses\TwinsVoices.cs" />
     <Compile Include="Bosses\WardFlash.cs" />
     <Compile Include="Bosses\TwinsLog.cs" />
+    <Compile Include="Bosses\TwinsLogPlayer.cs" />
+    <Compile Include="Bosses\TwinsMoveLog.cs" />
+    <Compile Include="Bosses\TwinsWave.cs" />
+    <Compile Include="Bosses\WaveLook.cs" />
     <Compile Include="Bosses\EmbeddedAudio.cs" />
     <Compile Include="ItemLevelCommand.cs" />
     <Compile Include="Plugin.cs" />

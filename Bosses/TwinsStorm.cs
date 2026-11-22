@@ -29,8 +29,9 @@ namespace NhxMagicWeapons.Bosses
         private const float AroundMin = 1.5f;
         private const float AroundMax = 4f;
         private const float StillSpeed = 1f;
-        // Each rune's hit: lightning, no stagger (one after another, it would stun-lock), dodged by a roll, not blocked
-        private const float RainDamage = 90f;
+        // Each rune's hit: lightning, no stagger (one after another, it would stun-lock), dodged by a roll, not blocked. 90
+        // until the twins' damage went up (the user, 2026-11-22: BossAttacks)
+        private const float RainDamage = 150f;
         // The cloud: how high over the player, how wide, how fast it catches up; how bright a rune's strike lights it
         private const float CloudHeight = 14f;
         private const float CloudRadius = 6f;

@@ -19,14 +19,18 @@ namespace NhxMagicWeapons.Bosses
     // - On each player's own game, as the rune strikes there (Kick, from ElementRune): within it and not rolling, Share of
     //   their health as its element, lessened by their resistance to it (TwinsPhase.Hurt: armor would all but cancel a
     //   flat hit this size), no stagger, and pushed straight away from it to PushBeyond past its edge
-    // It grows with the twin in its second phase (TwinsPhase.Grown). Its numbers are first guesses, for the co-op playtest
+    // It grows with the twin in its second phase (TwinsPhase.Grown). Its numbers are first guesses, for the co-op playtest.
+    // Share was 0.12 until the user (2026-11-22, after test fights: "It just tickles and nudges"; then "The resistances you
+    // saw on my player earlier are probably the max we can get to each element. Let's increase the pulse damage to the
+    // player takes between 20% and 25% of their max health from it, after resistances and armor"): armor doesn't touch
+    // it, and the resistance meads make a player Resistant (half), so 0.45 takes 22.5% from them, 45% from one without
     internal class TwinsPulse : MonoBehaviour
     {
         private const float Radius = 5f;
         private const float Dwell = 1f;
         private const float Warning = 1f;
         private const float Cooldown = 2f;
-        private const float Share = 0.12f;
+        private const float Share = 0.45f;
         private const float PushBeyond = 2f;
         // A player this much past its edge as it strikes is a near miss, for the log (meters)
         private const float NearMiss = 1.5f;
@@ -199,7 +203,7 @@ namespace NhxMagicWeapons.Bosses
             {
                 player.m_pushForce = push;
             }
-            TwinsLog.Event($"{TwinsLog.Name(player)} is kicked by {pulse}: {Share * 100f:0}% of their health, {from:0.#} m from it, pushed about {reach:0.#} m.");
+            TwinsLog.Event($"{TwinsLog.Name(player)} is kicked by {pulse}: {Share * 100f:0}% of their health before resistance, {from:0.#} m from it, pushed about {reach:0.#} m.");
         }
 
         private static bool Judged(Player player)

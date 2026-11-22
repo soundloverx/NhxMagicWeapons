@@ -1,5 +1,8 @@
 # Changelog
 
+## v2.1.0
+- Tighter tuning of the twin bosses.
+
 ## v2.0.0
 - Added the Stormcaller and the Firecaller, twin bosses called at their altars in the Ashlands by offering a Lodestone of the Elements
 

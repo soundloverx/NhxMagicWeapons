@@ -62,17 +62,22 @@ namespace NhxMagicWeapons.Bosses
         // A draining charge this small is gone (stacks)
         private const float CleanBelow = 0.005f;
         // The swap's answer to a clean staff: the twin's rune under the player, striking this long after it shows (the
-        // storm's rain runes warn as long), this wide (the comet's mark), for SwapDamage to whoever is still on it
+        // storm's rain runes warn as long), this wide (the comet's mark), for AnswerDamage to whoever is still on it. It
+        // was SwapDamage's 150 until the twins' damage went up (the user, 2026-11-22: BossAttacks), and the smites stayed
         internal const float AnswerDelay = 1.2f;
         internal const float AnswerRadius = 2.5f;
-        // Each stack slows eitr's (Static) or stamina's (Scorch) return by this much
+        internal const float AnswerDamage = 225f;
+        // Each stack caps eitr's (Static) or stamina's (Scorch) return this much lower, whatever else hastens it
+        // (ElementCharge's ceiling, 2026-11-22: it was a share of the rest)
         private const float RegenCut = 0.2f;
         // And from its first stack, while its staff is in hand, hastens the other's (Static stamina's, Scorch eitr's) by
         // this much, flat: a hold of 25 s costs about 10 s of regen, which the next staff's 20 s of this pays back
         private const float RegenBoost = 0.5f;
-        // The smites: the swap's and the full charge's, moderate (150 is 56 after 100 armor), the full charge's half again
-        // as much each time it comes again without a swap (150, 225, 338...: one each StackInterval now, from the fifth
-        // stack), before what SmiteWeakness adds; on the ground, this wide (their look only: they hit the one player)
+        // The smites: the swap's (to a staff still charged) and the full charge's, moderate (150 is 56 after 100 armor), the
+        // full charge's half again as much each time it comes again without a swap (150, 225, 338...: one each
+        // StackInterval now, from the fifth stack), before what SmiteWeakness adds; on the ground, this wide (their look
+        // only: they hit the one player). Kept when the twins' damage went up (the user, 2026-11-22): punishments, and
+        // with their growth and the weakness after them already the fight's hardest hits (225 took 224 of 382 in that test)
         internal const float SwapDamage = 150f;
         private const float OverloadDamage = 150f;
         private const float OverloadGrowth = 1.5f;
@@ -208,6 +213,7 @@ namespace NhxMagicWeapons.Bosses
                 StartStats(player);
                 TwinsLog.Event($"{TwinsLog.Name(player)} joins the fight ({(ring ? "inside the ring" : "by twins with no arena")}, "
                     + $"{Vector3.Distance(position, twin.transform.position):0} m from the nearest twin).");
+                TwinsLog.Loadout(player);
             }
             // Out of it (the ring holds, so: the twins gone, or twins with no arena left behind, or a cheat). A judged
             // player stays in it until they die, wherever they are (while a twin lives)
@@ -427,7 +433,7 @@ namespace NhxMagicWeapons.Bosses
             }
         }
 
-        // The hit of a twin's rune answering a clean staff (CallerBoss.RPC_Punish): SwapDamage of its element to
+        // The hit of a twin's rune answering a clean staff (CallerBoss.RPC_Punish): AnswerDamage of its element to
         // whoever is on the rune as it strikes; a roll through it dodges it, a block doesn't stop it, and it doesn't
         // stagger (as the storm's rain: TwinsStorm)
         internal static HitData AnswerHit(Element element, Character attacker)
@@ -435,11 +441,11 @@ namespace NhxMagicWeapons.Bosses
             HitData hit = new HitData();
             if (element == Element.Storm)
             {
-                hit.m_damage.m_lightning = SwapDamage;
+                hit.m_damage.m_lightning = AnswerDamage;
             }
             else
             {
-                hit.m_damage.m_fire = SwapDamage;
+                hit.m_damage.m_fire = AnswerDamage;
             }
             hit.m_blockable = false;
             hit.m_dodgeable = true;
@@ -515,17 +521,12 @@ namespace NhxMagicWeapons.Bosses
         }
 
         // Each stack in the log: what the fight has put on the player, and their regen with every effect on them (the
-        // charges', the armor's, meads'...)
+        // charges', the armor's, meads'...) and the gear's eitr regen, which the game adds after them (TwinsLog.EitrRegen)
         private static void LogStack(Player player, Element element, int stacks)
         {
             s_mostStacks[(int)element] = Mathf.Max(s_mostStacks[(int)element], stacks);
-            SEMan seman = player.GetSEMan();
-            float eitr = 1f;
-            seman.ModifyEitrRegen(ref eitr);
-            float stamina = 1f;
-            seman.ModifyStaminaRegen(ref stamina);
             TwinsLog.Event($"{TwinsLog.Name(player)}'s {ChargeName(element)} reaches {stacks}. "
-                + $"Now: {Describe(player, true)}; regen with every effect: eitr x{eitr:0.00}, stamina x{stamina:0.00}.");
+                + $"Now: {Describe(player, true)}; regen with every effect: eitr x{TwinsLog.EitrRegen(player):0.00}, stamina x{TwinsLog.StaminaRegen(player):0.00}.");
         }
 
         // "Static 6.2 in hand (eitr regen x0.00), Scorch 2.4 draining, clean in 12 s (no effect), Stormstruck 2 (48 s
@@ -547,7 +548,7 @@ namespace NhxMagicWeapons.Bosses
                 }
                 bool drawn = element == s_drawn;
                 string effect = !regen ? ""
-                    : drawn ? $" ({(element == Element.Storm ? "eitr" : "stamina")} regen x{Mathf.Max(0f, 1f - RegenCut * Mathf.FloorToInt(charge)):0.00}, "
+                    : drawn ? $" ({(element == Element.Storm ? "eitr" : "stamina")} regen at most x{Mathf.Max(0f, 1f - RegenCut * Mathf.FloorToInt(charge)):0.00}, "
                         + $"{(element == Element.Storm ? "stamina" : "eitr")} regen x{(charge >= 1f ? 1f + RegenBoost : 1f):0.00})"
                     : " (no effect)";
                 parts.Add($"{ChargeName(element)} {charge:0.0} {(drawn ? "in hand" : $"draining, clean in {(s_drain[e] > 0f ? charge / s_drain[e] : 0f):0} s")}{effect}");
@@ -600,6 +601,7 @@ namespace NhxMagicWeapons.Bosses
                 + $"{s_smites} overload smites, {s_smiteDamage:0} before resistances and armor; "
                 + $"most steps: Stormstruck {s_mostSteps[(int)Element.Storm]}, Flamestruck {s_mostSteps[(int)Element.Fire]}; {TwinsDrain.Summary()}.");
             TwinsLog.Event($"Fight summary for {name}: {TwinsLog.FightDamage()}.");
+            TwinsLog.Event($"Fight summary for {name}: {TwinsLog.FightPlayer()}.");
         }
 
         private static string Clock(float seconds)

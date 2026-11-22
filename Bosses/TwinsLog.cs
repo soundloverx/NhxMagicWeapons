@@ -28,9 +28,11 @@ namespace NhxMagicWeapons.Bosses
     //   what the duel has put on them. The local player's hits on a twin another game runs, as sent (that game logs what
     //   it took). And when the player leaves the fight (or dies), a summary: time on each staff, swaps, most stacks,
     //   smites, most steps, damage taken and dealt
+    // - The local player's side (TwinsLogPlayer): what they bring, eat and drink, the effects they gain and lose, their
+    //   health, stamina and eitr as the fight goes, staggers, healing
     // Off unless the config's "Twins fight log" is on (Plugin.TwinsFightLog; the user, the fight tested: "maybe disable
     // them so as not to spam the player so much")
-    internal static class TwinsLog
+    internal static partial class TwinsLog
     {
         private const float FlushEvery = 5f;
 
@@ -89,17 +91,32 @@ namespace NhxMagicWeapons.Bosses
             internal float m_fire;
             internal float m_spirit;
             internal string m_refused;
+            // It staggered the target (TwinsLogPlayer)
+            internal bool m_staggers;
         }
 
         private static Pending s_pending;
 
-        // Damage outside hits, added up
+        // Damage outside hits, added up; and healing (TwinsLogPlayer)
         private class Tally
         {
             internal Character m_target;
             internal string m_cause;
+            internal bool m_heal;
             internal float m_dealt;
             internal int m_count;
+        }
+
+        private static void AddTally(Character target, string cause, float amount, bool heal)
+        {
+            string key = (heal ? "heal|" : "") + target.GetInstanceID() + "|" + cause;
+            if (!s_tallies.TryGetValue(key, out Tally tally))
+            {
+                tally = new Tally { m_target = target, m_cause = cause, m_heal = heal };
+                s_tallies[key] = tally;
+            }
+            tally.m_dealt += amount;
+            tally.m_count++;
         }
 
         private static readonly Dictionary<string, Tally> s_tallies = new Dictionary<string, Tally>();
@@ -130,6 +147,7 @@ namespace NhxMagicWeapons.Bosses
             s_burnHere = 0f;
             s_hitsSent = 0;
             s_sentRaw = 0f;
+            StartPlayer();
         }
 
         internal static string FightDamage()
@@ -251,6 +269,10 @@ namespace NhxMagicWeapons.Bosses
                         line.Append($" (players' scaling x{pending.m_scale:0.###})");
                     }
                 }
+                if (pending.m_staggers)
+                {
+                    line.Append(", staggering them");
+                }
                 line.Append("; ").Append(Health(__instance));
                 Event(line.ToString());
                 Count(pending);
@@ -351,14 +373,7 @@ namespace NhxMagicWeapons.Bosses
                 string cause = hit != null && hit.m_hitType == HitData.HitType.Burning
                     ? (hit.m_damage.m_spirit > hit.m_damage.m_fire ? "spirit burning" : "burning")
                     : Source();
-                string key = __instance.GetInstanceID() + "|" + cause;
-                if (!s_tallies.TryGetValue(key, out Tally tally))
-                {
-                    tally = new Tally { m_target = __instance, m_cause = cause };
-                    s_tallies[key] = tally;
-                }
-                tally.m_dealt += dealt;
-                tally.m_count++;
+                AddTally(__instance, cause, dealt, false);
             }
         }
 
@@ -424,6 +439,7 @@ namespace NhxMagicWeapons.Bosses
             }
             s_flushTimer = FlushEvery;
             Flush();
+            Sample();
         }
 
         private static void Flush()
@@ -441,7 +457,8 @@ namespace NhxMagicWeapons.Bosses
                 {
                     continue;
                 }
-                Event($"{Name(tally.m_target)} took {tally.m_dealt:0.#} from {tally.m_cause} ({tally.m_count} times in the last {FlushEvery:0} s); {Health(tally.m_target)}");
+                Event($"{Name(tally.m_target)} {(tally.m_heal ? "healed" : "took")} {tally.m_dealt:0.#} from {tally.m_cause} "
+                    + $"({tally.m_count} times in the last {FlushEvery:0} s); {Health(tally.m_target)}");
             }
             foreach (string key in s_flushed)
             {
