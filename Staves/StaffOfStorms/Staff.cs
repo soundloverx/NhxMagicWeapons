@@ -50,7 +50,8 @@ namespace NhxMagicWeapons.Staves.StaffOfStorms
         // The bolt's damage, a side-grade to RtDMythics' staves (our friends') until late in the Deep North. Theirs reach
         // level 4, mostly blunt, with an orb hitting 1.5 m around: Mistwalker 163-181 (Mistlands, 28 eitr), Freyr T3
         // 195-213 (Ashlands, 38 eitr), Arcane T3 279-303 (Deep North, 38 eitr). With NhxIdolProgression's idols the staff
-        // reaches level 5 in the Mistlands, 9 in the Ashlands. Lightning: 135, 5 more each level, 11 from level 10. Spirit
+        // reaches level 5 in the Mistlands, 10 in the Ashlands (9 before NhxIdolProgression v1.1.0, which the numbers
+        // below were set for). Lightning: 135, 5 more each level, 11 from level 10. Spirit
         // from level 5 and fire from level 10, as the model changes: 10, and 1 more each level after. In all: 165 at 5, 189
         // at 9, 276 at 15, 341 at 20. That's 10% under what matched theirs (184 at 5, 212 at 9, 305 at 15), as the bolt
         // never misses: it hits at once, where the crosshair is. The Charred (Ashlands) are weak to spirit, which most

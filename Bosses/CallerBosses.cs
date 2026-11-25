@@ -32,7 +32,7 @@ namespace NhxMagicWeapons.Bosses
         // Each twin's health: 5000 at first, then half again (the user, 2026-11-15, after a full fight alone: "Next I want to
         // increase their health by 50%"). The game multiplies what they take by its divisor for the players near (CLLC's
         // health per player on the server)
-        private const float Health = 7500f;
+        private const float Health = 9000f;
         // Their two gaits: a monster's AI moves at m_speed and m_runSpeed, and their legs, twice as long, cover twice the
         // ground for each step (CallerBoss gives the animations half the speed). Walking as the player walks (1.6 m/s,
         // 3.2 for them); running at first as the player jogs (4 m/s, 8 for them), which outran the players (the user: "You

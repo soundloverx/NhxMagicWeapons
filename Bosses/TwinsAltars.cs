@@ -369,7 +369,7 @@ namespace NhxMagicWeapons.Bosses
             {
                 if (location != null && location.m_prefab.IsValid)
                 {
-                    s_gameLocations.Add(location.m_prefab.Name);
+                    s_gameLocations.Add(location.m_prefab.name);
                 }
             }
         }
@@ -397,7 +397,7 @@ namespace NhxMagicWeapons.Bosses
                 Uncache(zones.m_locationMaxGroupCache, instance);
             }
 
-            int location = instance.m_location.m_prefab.Name.GetStableHashCode();
+            int location = instance.m_location.m_prefab.name.GetStableHashCode();
             int proxy = zones.m_locationProxyPrefab.name.GetStableHashCode();
             float reach = instance.m_location.m_exteriorRadius + ClearMargin;
             Dictionary<int, bool> kept = new Dictionary<int, bool>();

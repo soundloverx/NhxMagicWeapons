@@ -62,7 +62,7 @@ namespace NhxMagicWeapons.Armor
         // Crafted at the Galdr Table with three of its four extensions; its fourth (the Standing Loom) allows the one
         // upgrade there, as the game asks one more level for each (Recipe.GetRequiredStationLevel). Then the Forge of
         // Potential, which has no maximum and takes a flametal protection idol (Ashlands) for each refinement
-        // (NhxIdolProgression moves on to bloodgold idols from level 5)
+        // (NhxIdolProgression moves on to bloodgold idols from level 10; from level 5 before its v1.1.0)
         private const int StationLevel = 4;
         private const int TableMaxLevel = 2;
         private const string Idol = "Upgrader6Armor";
