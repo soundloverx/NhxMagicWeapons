@@ -40,3 +40,6 @@ __pycache__/
 
 # Mod packaging output (if you zip builds for Thunderstore, etc.)
 *.zip
+
+# Magic Supremacy 3.1.5's whole bundle (97 MB): Tools\repack_bundle.py makes it from 3.1.5's DLL, kept outside the repo
+Assets/magic_supremacy

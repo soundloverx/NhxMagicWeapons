@@ -1,36 +1,72 @@
-# Makes Assets\nhx_magic_weapons from Assets\magic_supremacy: a copy of Magic Supremacy's bundle with only the prefabs the
-# mod loads (KEEP) and what they use, so that the mod ships a few MB instead of the whole bundle (97 MB).
+# Makes the mod's bundles from Magic Supremacy's: a copy of its bundle with only the prefabs the mod loads (BUNDLES, by
+# the output file's name) and what they use, so that the mod ships a few MB instead of the whole bundle (about 100 MB).
 #
 #   python -I Tools\slim_bundle.py Assets\magic_supremacy Assets\nhx_magic_weapons
+#       from Magic Supremacy 3.1.5's bundle (Tools\repack_bundle.py makes Assets\magic_supremacy from its DLL, kept as
+#       ..\Magic_Supremacy_3.1.5.dll; the bundle isn't in git)
+#   python -I Tools\slim_bundle.py <3.1.7's bundle> Assets\nhx_magic_weapons_317
+#       from Magic Supremacy 3.1.7's: Tools\repack_bundle.py makes it from its DLL, into a temporary folder (it isn't
+#       kept in Assets: 102 MB more in git, and the DLL makes it again)
 #
 # Needs UnityPy (pip install UnityPy). It keeps the prefabs' objects and everything they refer to (meshes, materials,
 # textures, shaders, sounds, the audio mixer), found by walking their references and their entries in the bundle's
 # preload table, plus every MonoScript (the file's script table refers to them). The texture, mesh and sound data, kept
 # outside the objects in the bundle's .resS and .resource files, are copied into smaller ones and their offsets updated.
 # The bundle's container lists the kept prefabs only, with their own preload entries. The objects keep their path IDs, so
-# nothing else changes; the bundle keeps its internal names (CAB-...), so it still can't be loaded next to Magic
-# Supremacy's.
-# Add a prefab here when the mod starts loading another from the bundle, and run this again.
+# nothing else changes. nhx_magic_weapons keeps Magic Supremacy's internal names (CAB-...), so it can't be loaded next
+# to Magic Supremacy's; nhx_magic_weapons_317 gets its own (below).
+# Add a prefab to a bundle's list when the mod starts loading another from it, and run this again.
+import hashlib
+import os
 import sys
 
 import UnityPy
 from UnityPy.streams import EndianBinaryReader
 
-KEEP = [
-    "StaffStormcallerShocker_DO",                # the Staff of Storms' model (Thundersurge)
-    "fx_stormcaller_staff_shock_DO",             # its buzz, and its sparks' material for the bolt
-    "fx_stormcaller_staff_sphere_trap_land_DO",  # the crackle
-    "fx_stormcaller_staff_sphere_hit_DO",        # the bolt's hit: a bang and a flash
-    "fx_frostcaller_staff_shard_hit_DO",         # its material's additive particle shader, for the bolt's glow
-    "StaffFirecallerBlaster_DO",                 # the Wrath of Muspelheim's model (the Incinerator)
-    "sfx_firecaller_staff_blaster_shot_DO",      # its beam's shot
-    "fx_firecallercaller_staff_blaster_hit_DO",  # its blast, and the embers rising from its head
-    "fx_firecaller_staff_thrower_DO",            # its flamethrower's flames
-    "ArmorStormcallerHelmet_DO",                 # the Stormcaller set: Stormcaller's Raiment, and in red (Tools\
-    "ArmorStormcallerChest_DO",                  # recolor_armor.py) the Firecaller's Regalia
-    "ArmorStormcallerLegs_DO",
-    "ArmorStormcallerCape_DO",
-]
+BUNDLES = {
+    # From Magic Supremacy 3.1.5's bundle
+    "nhx_magic_weapons": {
+        "keep": [
+            "StaffStormcallerShocker_DO",                # the Staff of Storms' model (Thundersurge)
+            "fx_stormcaller_staff_shock_DO",             # its buzz, and its sparks' material for the bolt
+            "fx_stormcaller_staff_sphere_trap_land_DO",  # the crackle
+            "fx_stormcaller_staff_sphere_hit_DO",        # the bolt's hit: a bang and a flash
+            "fx_frostcaller_staff_shard_hit_DO",         # its material's additive particle shader, for the bolt's glow
+            "StaffFirecallerBlaster_DO",                 # the Wrath of Muspelheim's model (the Incinerator)
+            "sfx_firecaller_staff_blaster_shot_DO",      # its beam's shot
+            "fx_firecallercaller_staff_blaster_hit_DO",  # its blast, and the embers rising from its head
+            "fx_firecaller_staff_thrower_DO",            # its flamethrower's flames
+            "ArmorStormcallerHelmet_DO",                 # the Stormcaller set: Stormcaller's Raiment, and in red (Tools\
+            "ArmorStormcallerChest_DO",                  # recolor_armor.py) the Firecaller's Regalia
+            "ArmorStormcallerLegs_DO",
+            "ArmorStormcallerCape_DO",
+        ],
+    },
+    # From Magic Supremacy 3.1.7's bundle (2026-11-28): the Lightcaller and Bloodcaller sets and two staves, the items as
+    # its prefabs make them (PrefabItems.cs), with what their attacks and set bonuses spawn. 3.1.7's bundle has the same
+    # internal names as 3.1.5's, and Unity can't load two bundles holding the same files, so this one is renamed: its
+    # files are CAB- and the MD5 of its name, as Unity names them, and the AssetBundle takes its name. Its container
+    # lists every prefab kept that Magic Supremacy's container listed, for the mod to register the networked ones
+    "nhx_magic_weapons_317": {
+        "keep": [
+            "ArmorLightcallerHelmet_DO",      # the Lightcaller set, Mistlands in Magic Supremacy
+            "ArmorLightcallerChest_DO",
+            "ArmorLightcallerLegs_DO",
+            "ArmorLightcallerCape_DO",
+            "ArmorBloodcallerHelmet_DO",      # the Bloodcaller set, Deep North in Magic Supremacy
+            "ArmorBloodcallerChest_DO",
+            "ArmorBloodcallerLegs_DO",
+            "ArmorBloodcallerCape_DO",
+            "StaffStormcallerSphere_DO",      # Tempest Eye
+            "StaffBloodcallerShotgun_DO",     # Blood Requiem
+            # Asked by name by the set bonuses' auras (Aoe.m_statusEffect), so no reference reaches them
+            "SE_LightcallerAura_DO.asset",
+            "SE_BloodcallerDeathTrigger_DO.asset",
+        ],
+        "rename": True,
+        "list_kept": True,
+    },
+}
 ALIGN = 16
 
 
@@ -63,17 +99,22 @@ def resources(value, found):
 
 
 def main(src, dst):
+    bundle_name = os.path.basename(dst)
+    if bundle_name not in BUNDLES:
+        raise SystemExit(f"No list for {bundle_name}: the output is one of {', '.join(BUNDLES)}")
+    spec = BUNDLES[bundle_name]
     env = UnityPy.load(src)
     bundle = env.file
     cab_name, cab = next((n, f) for n, f in bundle.files.items() if hasattr(f, "objects"))
     objects = cab.objects
     asset_bundle = next(o for o in objects.values() if o.type.name == "AssetBundle")
     tree = asset_bundle.read_typetree()
+    new_cab = "CAB-" + hashlib.md5(bundle_name.encode()).hexdigest() if spec.get("rename") else cab_name
 
     # The prefabs' container entries, and what they use
     entries = []
-    for name in KEEP:
-        suffix = "/" + name.lower() + ".prefab"
+    for name in spec["keep"]:
+        suffix = "/" + (name.lower() if name.endswith(".asset") else name.lower() + ".prefab")
         match = next(((path, info) for path, info in tree["m_Container"] if path.endswith(suffix)), None)
         if not match:
             raise SystemExit(f"{name} isn't in the bundle's container")
@@ -120,6 +161,7 @@ def main(src, dst):
             source.Position = start
             chunk = source.read_bytes(size)
             span[offset_key] = len(target)
+            span[path_key] = span[path_key].replace(cab_name, new_cab)
             target += chunk
             expected_spans.setdefault(path_id, []).append(bytes(chunk))
         obj.save_typetree(data)
@@ -129,16 +171,29 @@ def main(src, dst):
         replaced = EndianBinaryReader(bytes(data))
         replaced.flags = bundle.files[file_name].flags
         bundle.files[file_name] = replaced
+    # The file names are the bundle's directory as it's written
+    bundle.files = {n.replace(cab_name, new_cab): f for n, f in bundle.files.items()}
 
-    # The container and preload table: the kept prefabs only
+    # The container and preload table: the kept prefabs only, or with list_kept every prefab kept that the container
+    # listed too, in its order
+    if spec.get("list_kept"):
+        listed = {id(info) for _, info in entries}
+        entries = [(path, info) for path, info in tree["m_Container"]
+                   if id(info) in listed or (path.endswith(".prefab") and info["asset"]["m_PathID"] in keep)]
     preload = []
     container = []
     for path, info in entries:
         old = tree["m_PreloadTable"][info["preloadIndex"]:info["preloadIndex"] + info["preloadSize"]]
+        missing = [p["m_PathID"] for p in old if p["m_FileID"] == 0 and p["m_PathID"] not in keep]
+        if missing:
+            raise SystemExit(f"{path} preloads objects that aren't kept: {missing[:5]}")
         container.append((path, dict(info, preloadIndex=len(preload), preloadSize=len(old))))
         preload += old
     tree["m_Container"] = container
     tree["m_PreloadTable"] = preload
+    if spec.get("rename"):
+        tree["m_Name"] = bundle_name
+        tree["m_AssetBundleName"] = bundle_name
     asset_bundle.save_typetree(tree)
 
     total = len(objects)
@@ -148,17 +203,24 @@ def main(src, dst):
     # in 128 KB LZ4HC chunks. UnityPy's "lz4hc" puts the blocks info at the end (0xC3)
     out = bundle.save(packer=(0x243, 3))
     open(dst, "wb").write(out)
-    print(f"Kept {len(keep)} objects of {total}; resource files {[(n, len(d)) for n, d in new_files.items()]}; "
+    print(f"Kept {len(keep)} objects of {total}; resource files {[(n.replace(cab_name, new_cab), len(d)) for n, d in new_files.items()]}; "
           f"wrote {len(out):,} bytes to {dst}")
-    check(dst, keep, expected_raw, expected_spans)
+    check(dst, keep, expected_raw, expected_spans, [path for path, _ in container], new_cab, bundle_name)
 
 
-# Reads the new bundle back: the same objects, each one's data as it was (or what it points to in the resource files),
-# every sound starting with its FMOD header, every texture readable, and the container listing the kept prefabs
-def check(path, keep, expected_raw, expected_spans):
+# Reads the new bundle back: its files' names, the same objects, each one's data as it was (or what it points to in the
+# resource files), every sound starting with its FMOD header, every texture readable, and the container listing the kept
+# prefabs
+def check(path, keep, expected_raw, expected_spans, expected_container, cab_name, bundle_name):
     env = UnityPy.load(path)
     bundle = env.file
-    objects = next(f for f in bundle.files.values() if hasattr(f, "objects")).objects
+    if any(not n.startswith(cab_name) for n in bundle.files):
+        raise SystemExit(f"Unexpected file names: {list(bundle.files)}")
+    cab = next(f for f in bundle.files.values() if hasattr(f, "objects"))
+    objects = cab.objects
+    asset_bundle = next(o for o in objects.values() if o.type.name == "AssetBundle").read_typetree()
+    if BUNDLES[bundle_name].get("rename") and asset_bundle["m_AssetBundleName"] != bundle_name:
+        raise SystemExit(f"The bundle is named {asset_bundle['m_AssetBundleName']}")
     if set(objects) != keep:
         raise SystemExit("The new bundle doesn't hold the kept objects")
     for path_id, obj in objects.items():
@@ -169,6 +231,8 @@ def check(path, keep, expected_raw, expected_spans):
             spans = []
             resources(data, spans)
             for (span, offset_key, size_key, path_key), expected in zip(spans, expected_spans[path_id]):
+                if span[path_key] != f"archive:/{cab_name}/{span[path_key].split('/')[-1]}":
+                    raise SystemExit(f"{obj.peek_name()} ({obj.type.name}) points to {span[path_key]}")
                 source = bundle.files[span[path_key].split("/")[-1]]
                 source.Position = span[offset_key]
                 if source.read_bytes(span[size_key]) != expected:
@@ -177,13 +241,14 @@ def check(path, keep, expected_raw, expected_spans):
                     raise SystemExit(f"The sound {obj.peek_name()} doesn't start with FSB5")
         if obj.type.name == "Texture2D":
             obj.read().image
-    names = sorted(path.split("/")[-1] for path, _ in env.container.items())
-    if names != sorted(name.lower() + ".prefab" for name in KEEP):
+    names = sorted(path for path, _ in asset_bundle["m_Container"])
+    if names != sorted(expected_container):
         raise SystemExit(f"Unexpected container: {names}")
-    print(f"Checked {len(objects)} objects, {sum(len(s) for s in expected_spans.values())} resource spans; container: {names}")
+    print(f"Checked {len(objects)} objects, {sum(len(s) for s in expected_spans.values())} resource spans; "
+          f"container: {[n.split('/')[-1] for n in names]}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        raise SystemExit("usage: slim_bundle.py <magic_supremacy bundle> <output bundle>")
+        raise SystemExit("usage: slim_bundle.py <Magic Supremacy's bundle> <output bundle>")
     main(sys.argv[1], sys.argv[2])

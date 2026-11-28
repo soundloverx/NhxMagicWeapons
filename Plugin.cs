@@ -21,13 +21,17 @@ namespace NhxMagicWeapons
     {
         internal const string PluginGuid = "NhxMagicWeapons";
         private const string PluginName = "NhxMagicWeapons";
-        private const string PluginVersion = "2.1.0";
+        private const string PluginVersion = "3.0.0";
 
         // What the mod uses of Magic Supremacy 3.1.5's asset bundle (Tools\slim_bundle.py), embedded in the DLL
         private const string BundleResource = "nhx_magic_weapons";
+        // And of 3.1.7's, under names of its own so that Unity loads it next to the first (Tools\slim_bundle.py): the
+        // Lightcaller and Bloodcaller sets, Tempest Eye and Blood Requiem (PrefabItems)
+        private const string Bundle317Resource = "nhx_magic_weapons_317";
 
         internal static ManualLogSource Log { get; private set; }
         internal static AssetBundle Assets { get; private set; }
+        internal static AssetBundle Assets317 { get; private set; }
         // The twins' fight in the log (Bosses\TwinsLog), off unless asked for (the user, 2026-11-15, the fight tested:
         // "maybe disable them so as not to spam the player so much"; kept for a later round of balancing)
         internal static ConfigEntry<bool> TwinsFightLog { get; private set; }
@@ -35,8 +39,9 @@ namespace NhxMagicWeapons
         // user, 2026-11-22: "it should be easy to turn off because I imagine the log spam")
         internal static ConfigEntry<bool> TwinsMoveLog { get; private set; }
 
-        // Unity reads the bundle from it as its assets are loaded, so it stays open for as long as the game runs
+        // Unity reads the bundles from them as their assets are loaded, so they stay open for as long as the game runs
         private static Stream s_bundleStream;
+        private static Stream s_bundle317Stream;
 
         private void Awake()
         {
@@ -52,6 +57,12 @@ namespace NhxMagicWeapons
             {
                 Log.LogError($"Couldn't load the asset bundle {BundleResource} from the DLL, so there are no magic weapons.");
                 return;
+            }
+            s_bundle317Stream = typeof(Plugin).Assembly.GetManifestResourceStream(Bundle317Resource);
+            Assets317 = s_bundle317Stream != null ? AssetBundle.LoadFromStream(s_bundle317Stream) : null;
+            if (Assets317 == null)
+            {
+                Log.LogError($"Couldn't load the asset bundle {Bundle317Resource} from the DLL, so there are no Lightcaller or Bloodcaller sets, Tempest Eye or Blood Requiem.");
             }
 
             AddLocalizations();
@@ -97,6 +108,11 @@ namespace NhxMagicWeapons
             Armor.StormcallerArmor.Add();
             // They wear the sets
             Bosses.CallerBosses.Add();
+            // Magic Supremacy 3.1.7's sets and staves, as its prefabs make them, to try out
+            if (Assets317)
+            {
+                PrefabItems.Add();
+            }
         }
 
         private static void AddLocalizations()

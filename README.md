@@ -64,6 +64,24 @@ Refined past level 10, the sets start to show it, with the whole set on. What co
 - **From level 15:** the cloak's cloth takes a pattern, storm clouds or dark ember veins. From 20 it glows faintly, with a slow pulse.
 - **At level 20:** flames at the hood's eyes and embers at each step (Firecaller), or three crystal shards circling the shoulders with arcs between them (Stormcaller).
 
+## Lightcaller and Bloodcaller sets, Tempest Eye and Blood Requiem (testing)
+
+Magic Supremacy 3.1.7's Lightcaller set (hood, vestments, legwraps, cape), Bloodcaller set (adornment, vestments, legwraps, crimson veil), and its Tempest Eye and Blood Requiem staves, to try out before they become Deep North sets. They're as Magic Supremacy's prefabs make them: its stats, attacks and set bonuses. What its own code adds isn't here: Tempest Eye's secondary attack leaves a 30-second lightning field instead of a mine, the set auras reach enemies and allies alike (the Lightcaller's heals enemies too), the Bloodcaller's mark doesn't heal you when a marked enemy dies, Blood Requiem steals 1 health per pellet instead of 2.5, and the pieces don't add max health, max eitr or skill levels.
+
+They're made at the Galdr Table, from level 1, and upgraded there up to level 4, from Magic Supremacy's recipes without its own materials (spirits and fittings). By the game's item names:
+
+| Item | Crafting | Each upgrade |
+| --- | --- | --- |
+| Lightcaller Hood | 6 `Eitr`, 16 `LinenThread`, 8 `Bronze` | 3 `Eitr` |
+| Lightcaller Vestments, Legwraps | 6 `Eitr`, 20 `LinenThread` | 3 `Eitr` |
+| Lightcaller Cape | 6 `Eitr`, 24 `LinenThread`, 2 `BlackCore` | 3 `Eitr` |
+| Bloodcaller Adornment | 3 `NornThread`, 10 `GiantBloodSack` | 2 `NornThread` |
+| Bloodcaller Vestments | 5 `NornThread`, 6 `MooseHide`, 8 `Gold` | 3 `NornThread` |
+| Bloodcaller Legwraps | 5 `NornThread`, 6 `MooseHide`, 4 `Gold` | 3 `NornThread` |
+| Bloodcaller Crimson Veil | 6 `NornThread`, 6 `MooseHide`, 8 `Gold` | 3 `NornThread` |
+| Tempest Eye | 1 `GemstoneBlue`, 16 `Eitr`, 10 `FlametalNew` | 1 `GemstoneBlue`, 8 `Eitr` |
+| Blood Requiem | 1 `OrbThunderBlood`, 5 `NornThread`, 10 `Gold` | 1 `OrbThunderBlood`, 2 `NornThread` |
+
 ## Installing
 
 Everyone on the server needs it, with the same version: the server, and every player. Copy the NhxMagicWeapons folder into BepInEx\plugins. It needs Jotunn.

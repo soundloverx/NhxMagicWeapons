@@ -2,6 +2,11 @@
 #
 #   python -I Tools\repack_bundle.py <Magic_Supremacy.dll or bundle> Assets\magic_supremacy
 #
+# Assets\magic_supremacy is the bundle of Magic Supremacy 3.1.5, which the other tools read: the source of
+# Assets\nhx_magic_weapons and of the textures and parts made from it. It isn't in git since 2026-11-28 (97 MB), so it's
+# made here from 3.1.5's DLL, kept as ..\Magic_Supremacy_3.1.5.dll next to the project folder (this gives the same bundle,
+# byte for byte, as the one git had).
+#
 # Magic Supremacy embeds its asset bundle in its DLL, compressed as one LZMA block, so Unity has to decompress all of it
 # (117 MB for 3.1.5) into memory when it loads. This keeps the bundle's content byte for byte and only repacks its data
 # as 128 KB LZ4HC chunks, the layout of the game's own bundles, so that AssetBundle.LoadFromFile reads assets on demand.
