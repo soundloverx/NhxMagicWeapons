@@ -43,8 +43,8 @@ namespace NhxMagicWeapons.Bosses
         // (2026-11-22): a player with a speed mead jogs faster than 4.5 (Lupine Extract's +20%: ~4.6), and the hunters
         // fell behind until their rush (the user: "the hunter twin just walking around until the teleport cooldown ended,
         // then it returned to chase me"); at 5.5 it gains on a jog, and a sprint (7, 8 with the mead) still escapes it
-        private const float WalkSpeed = 1.6f * Size;
-        private const float RunSpeed = 5.5f;
+        private const float WalkSpeed = 1.5f * Size;
+        private const float RunSpeed = 5f;
         // How far they notice players (meters): seen within their view's angle, or heard
         private const float ViewRange = 40f;
         private const float HearRange = 30f;

@@ -729,12 +729,12 @@ namespace NhxMagicWeapons.Bosses
             return TwinsRing.Inside(storm, player.transform.position);
         }
 
-        // `share` of the player's health as the element, lessened by their resistance to it; no stagger, no push (the
-        // pulse's too: TwinsPulse)
+        // `share` of the player's health as the element, lessened by their resistance to it and the world's share of the
+        // twins' damage (BossDamage); no stagger, no push (the pulse's too: TwinsPulse)
         internal static void Hurt(Player player, Element element, float share)
         {
             HitData hit = new HitData();
-            float damage = player.GetMaxHealth() * share;
+            float damage = player.GetMaxHealth() * share * BossDamage.Scale;
             if (element == Element.Storm)
             {
                 hit.m_damage.m_lightning = damage;

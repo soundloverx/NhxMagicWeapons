@@ -130,6 +130,7 @@
     <Compile Include="Bosses\BossAttacks.cs" />
     <Compile Include="Bosses\BossBolt.cs" />
     <Compile Include="Bosses\BossCall.cs" />
+    <Compile Include="Bosses\BossDamage.cs" />
     <Compile Include="Bosses\BossFlames.cs" />
     <Compile Include="Bosses\CallerBoss.cs" />
     <Compile Include="Bosses\CallerBosses.cs" />

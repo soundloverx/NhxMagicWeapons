@@ -88,6 +88,8 @@ namespace NhxMagicWeapons.Bosses
             internal bool m_applied;
             internal float m_took;
             internal float m_scale = 1f;
+            // The world's share of the twins' damage, on their hits (BossDamage scales them after this sees them)
+            internal float m_bossScale = 1f;
             internal float m_fire;
             internal float m_spirit;
             internal string m_refused;
@@ -205,6 +207,7 @@ namespace NhxMagicWeapons.Bosses
                     m_staggered = !__instance.IsPlayer() && __instance.IsStaggering(),
                     m_dodged = hit.m_dodgeable && __instance.IsDodgeInvincible(),
                     m_blocking = hit.m_blockable && __instance.IsBlocking(),
+                    m_bossScale = BossDamage.For(__instance, hit),
                 };
             }
 
@@ -224,6 +227,10 @@ namespace NhxMagicWeapons.Bosses
                     line.Append(" [").Append(pending.m_source).Append(']');
                 }
                 line.Append(": ").Append(Damages(pending.m_raw, pending.m_mods));
+                if (Mathf.Abs(pending.m_bossScale - 1f) > 0.001f)
+                {
+                    line.Append($" x{pending.m_bossScale:0.##} (the world's share of the twins' damage)");
+                }
                 if (pending.m_duel != null)
                 {
                     line.Append(" [on them: ").Append(pending.m_duel).Append(']');

@@ -697,6 +697,12 @@ namespace NhxMagicWeapons.Bosses
             {
                 hit.SetAttacker(attacker);
             }
+            else
+            {
+                // From no twin: the world's share of the twins' damage here, as the victim's game won't see a twin's hit
+                // (BossDamage)
+                hit.m_damage.Modify(BossDamage.Scale);
+            }
             victim.Damage(hit);
         }
     }
