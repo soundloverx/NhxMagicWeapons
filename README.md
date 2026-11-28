@@ -64,9 +64,13 @@ Refined past level 10, the sets start to show it, with the whole set on. What co
 - **From level 15:** the cloak's cloth takes a pattern, storm clouds or dark ember veins. From 20 it glows faintly, with a slow pulse.
 - **At level 20:** flames at the hood's eyes and embers at each step (Firecaller), or three crystal shards circling the shoulders with arcs between them (Stormcaller).
 
-## Lightcaller and Bloodcaller sets, Tempest Eye and Blood Requiem (testing)
+## Lightcaller and Bloodcaller sets, and four more staves (testing)
 
-Magic Supremacy 3.1.7's Lightcaller set (hood, vestments, legwraps, cape), Bloodcaller set (adornment, vestments, legwraps, crimson veil), and its Tempest Eye and Blood Requiem staves, to try out before they become Deep North sets. They're as Magic Supremacy's prefabs make them: its stats, attacks and set bonuses. What its own code adds isn't here: Tempest Eye's secondary attack leaves a 30-second lightning field instead of a mine, the set auras reach enemies and allies alike (the Lightcaller's heals enemies too), the Bloodcaller's mark doesn't heal you when a marked enemy dies, Blood Requiem steals 1 health per pellet instead of 2.5, and the pieces don't add max health, max eitr or skill levels.
+Magic Supremacy 3.1.7's Lightcaller set (hood, vestments, legwraps, cape), Bloodcaller set (adornment, vestments, legwraps, crimson veil), and its Blood Requiem staff, to try out before they become Deep North sets. With them, three more of its staves to try, of which 2 or 3 will stay with Blood Requiem: Sanguine Concord, the Candle of Vital Light and the Springbloom Parasol.
+
+They're as Magic Supremacy's prefabs make them: its stats, attacks and set bonuses. Two things its own code does are here, as the staves' main attacks don't work without them: Sanguine Concord's pellets heal allies and fly through enemies, and the Candle's sigil heals once and goes, 3 at most. The rest of what its code adds isn't: the set auras reach enemies and allies alike (the Lightcaller's heals enemies too), the Bloodcaller's mark doesn't heal you when a marked enemy dies, Blood Requiem steals 1 health per pellet instead of 2.5, the staves' buffs have no limit, and the pieces and Sanguine Concord's buff don't add max health, max eitr or skill levels. Each attack costs the main attack's eitr, as the game charges it. The Springbloom Parasol closes when it's on your back.
+
+The Springbloom Parasol is becoming a mage tank's weapon with the Lightcaller set, in steps (being built). Without all four Lightcaller pieces, neither of its attacks works. With them, its main attack is a channel instead of Magic Supremacy's shield: hold it and the parasol is held forward, spinning, while a vortex swirls around you; you move at half speed and it takes 10 eitr a second (less with Elemental Magic skill) until you let go or run out. For now it does nothing more: what it does to the damage you take comes next. Its secondary attack is still the petal buff, for its own 80 eitr.
 
 They're made at the Galdr Table, from level 1, and upgraded there up to level 4, from Magic Supremacy's recipes without its own materials (spirits and fittings). By the game's item names:
 
@@ -79,8 +83,10 @@ They're made at the Galdr Table, from level 1, and upgraded there up to level 4,
 | Bloodcaller Vestments | 5 `NornThread`, 6 `MooseHide`, 8 `Gold` | 3 `NornThread` |
 | Bloodcaller Legwraps | 5 `NornThread`, 6 `MooseHide`, 4 `Gold` | 3 `NornThread` |
 | Bloodcaller Crimson Veil | 6 `NornThread`, 6 `MooseHide`, 8 `Gold` | 3 `NornThread` |
-| Tempest Eye | 1 `GemstoneBlue`, 16 `Eitr`, 10 `FlametalNew` | 1 `GemstoneBlue`, 8 `Eitr` |
 | Blood Requiem | 1 `OrbThunderBlood`, 5 `NornThread`, 10 `Gold` | 1 `OrbThunderBlood`, 2 `NornThread` |
+| Sanguine Concord (no upgrades) | 1 `OrbThunderBlood`, 6 `GiantBloodSack`, 10 `Gold` | |
+| Candle of Vital Light | 1 `TrophySeeker`, 16 `Eitr`, 24 `Bronze` | 8 `Eitr` |
+| Springbloom Parasol | 1 `TrophyGjall`, 16 `Eitr`, 20 `YggdrasilWood` | 8 `Eitr` |
 
 ## Installing
 

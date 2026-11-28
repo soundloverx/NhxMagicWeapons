@@ -42,7 +42,7 @@ BUNDLES = {
             "ArmorStormcallerCape_DO",
         ],
     },
-    # From Magic Supremacy 3.1.7's bundle (2026-11-28): the Lightcaller and Bloodcaller sets and two staves, the items as
+    # From Magic Supremacy 3.1.7's bundle (2026-11-28): the Lightcaller and Bloodcaller sets and four staves, the items as
     # its prefabs make them (PrefabItems.cs), with what their attacks and set bonuses spawn. 3.1.7's bundle has the same
     # internal names as 3.1.5's, and Unity can't load two bundles holding the same files, so this one is renamed: its
     # files are CAB- and the MD5 of its name, as Unity names them, and the AssetBundle takes its name. Its container
@@ -57,11 +57,22 @@ BUNDLES = {
             "ArmorBloodcallerChest_DO",
             "ArmorBloodcallerLegs_DO",
             "ArmorBloodcallerCape_DO",
-            "StaffStormcallerSphere_DO",      # Tempest Eye
             "StaffBloodcallerShotgun_DO",     # Blood Requiem
-            # Asked by name by the set bonuses' auras (Aoe.m_statusEffect), so no reference reaches them
+            "StaffBloodcallerHeal_DO",        # Sanguine Concord
+            "StaffLightcallerHeal_DO",        # Candle of Vital Light
+            "StaffWindcallerBuff_DO",         # Springbloom Parasol
+            # The Candle's sigil's flash as it heals and goes (OneHitAoe), which Magic Supremacy's code spawns by name
+            "fx_lightcaller_staff_sigil_hit_DO",
+            # Asked by name (Aoe.m_statusEffect, and FriendlyHeal's), so no reference reaches them: by the set bonuses'
+            # auras, then by the staves
             "SE_LightcallerAura_DO.asset",
             "SE_BloodcallerDeathTrigger_DO.asset",
+            "SE_BloodcallerHeal_DO.asset",
+            "SE_BloodcallerBuff_DO.asset",
+            "SE_LightcallerSigil_DO.asset",
+            "SE_LightcallerHeal_DO.asset",
+            "SE_WindcallerShield_DO.asset",
+            "SE_WindcallerPetal_DO.asset",
         ],
         "rename": True,
         "list_kept": True,

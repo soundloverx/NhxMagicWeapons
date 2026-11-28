@@ -72,6 +72,8 @@ namespace NhxMagicWeapons
             CommandManager.Instance.AddConsoleCommand(new BeamOrbitCommand());
             CommandManager.Instance.AddConsoleCommand(new BossCommand());
             CommandManager.Instance.AddConsoleCommand(new AltarCommand());
+            CommandManager.Instance.AddConsoleCommand(new ParasolPoseCommand());
+            CommandManager.Instance.AddConsoleCommand(new ParasolSpinCommand());
             new Harmony(PluginGuid).PatchAll(typeof(Plugin).Assembly);
             PrefabManager.OnVanillaPrefabsAvailable += AddItems;
             PrefabManager.OnPrefabsRegistered += AudioRouting.Apply;
